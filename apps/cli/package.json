@@ -1,13 +1,16 @@
 {
   "name": "stora-sh",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The intelligent mobile app deployment tool",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
     "stora": "./dist/index.js"
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
