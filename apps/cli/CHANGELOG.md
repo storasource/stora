@@ -1,5 +1,14 @@
 # stora-sh
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @stora-sh/compliance@0.1.1
+  - @stora-sh/screenshots@0.1.2
+  - @stora-sh/shared@0.1.1
+
 ## 0.1.1
 
 ### Patch Changes

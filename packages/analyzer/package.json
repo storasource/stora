@@ -1,6 +1,6 @@
 {
   "name": "@stora-sh/analyzer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Deep app analysis - framework detection, metadata extraction, and code analysis",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -12,7 +12,10 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -20,7 +23,14 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts"
   },
-  "keywords": ["analyzer", "mobile", "react-native", "flutter", "ios", "android"],
+  "keywords": [
+    "analyzer",
+    "mobile",
+    "react-native",
+    "flutter",
+    "ios",
+    "android"
+  ],
   "author": "Carlton Aikins",
   "license": "MIT",
   "repository": {

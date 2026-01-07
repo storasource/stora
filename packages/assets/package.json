@@ -1,6 +1,6 @@
 {
   "name": "@stora-sh/assets",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "App asset detection and generation - icons, screenshots, and more",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -12,7 +12,10 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -20,7 +23,13 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts"
   },
-  "keywords": ["assets", "icons", "screenshots", "mobile", "app-store"],
+  "keywords": [
+    "assets",
+    "icons",
+    "screenshots",
+    "mobile",
+    "app-store"
+  ],
   "author": "Carlton Aikins",
   "license": "MIT",
   "repository": {

@@ -1,5 +1,11 @@
 # @stora/screenshots
 
+## 0.1.2
+
+### Patch Changes
+
+- Rename packages from @stora to @stora-sh scope
+
 ## 0.1.1
 
 ### Patch Changes

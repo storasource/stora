@@ -1,6 +1,6 @@
 {
   "name": "@stora-sh/compliance",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI-powered compliance checking for iOS App Store and Google Play",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -12,7 +12,10 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
