@@ -1,5 +1,5 @@
 {
-  "name": "@stora/assets",
+  "name": "@stora-sh/assets",
   "version": "0.1.0",
   "description": "App asset detection and generation - icons, screenshots, and more",
   "main": "./dist/index.js",

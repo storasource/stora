@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { captureScreenshots } from '@stora/screenshots';
+import { captureScreenshots } from '@stora-sh/screenshots';
 
 export function createScreenshotsCommand(): Command {
   const cmd = new Command('screenshots')

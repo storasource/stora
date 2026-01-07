@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { analyzeCompliance } from '@stora/compliance';
+import { analyzeCompliance } from '@stora-sh/compliance';
 
 export function createComplianceCommand(): Command {
   const cmd = new Command('compliance')

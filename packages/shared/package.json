@@ -1,5 +1,5 @@
 {
-  "name": "@stora/shared",
+  "name": "@stora-sh/shared",
   "version": "0.1.0",
   "description": "Shared utilities and types for Stora packages",
   "main": "./dist/index.js",

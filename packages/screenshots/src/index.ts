@@ -1,11 +1,11 @@
 /**
- * @stora/screenshots
+ * @stora-sh/screenshots
  *
  * AI-powered agentic screenshot automation for mobile apps using Maestro.
  *
  * @example
  * ```typescript
- * import { captureScreenshots } from '@stora/screenshots';
+ * import { captureScreenshots } from '@stora-sh/screenshots';
  *
  * const result = await captureScreenshots({
  *   bundleId: 'com.example.app',

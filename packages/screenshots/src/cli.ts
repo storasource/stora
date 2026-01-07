@@ -1,5 +1,5 @@
 /**
- * @stora/screenshots CLI
+ * @stora-sh/screenshots CLI
  *
  * AI-powered agentic screenshot automation for mobile apps
  */

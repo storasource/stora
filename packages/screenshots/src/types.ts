@@ -1,5 +1,5 @@
 /**
- * @stora/screenshots - Type definitions
+ * @stora-sh/screenshots - Type definitions
  */
 
 export interface ScreenshotterOptions {

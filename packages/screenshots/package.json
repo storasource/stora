@@ -1,5 +1,5 @@
 {
-  "name": "@stora/screenshots",
+  "name": "@stora-sh/screenshots",
   "version": "0.1.1",
   "description": "AI-powered agentic screenshot automation for mobile apps using Maestro",
   "main": "./dist/index.js",

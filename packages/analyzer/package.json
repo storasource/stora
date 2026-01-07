@@ -1,5 +1,5 @@
 {
-  "name": "@stora/analyzer",
+  "name": "@stora-sh/analyzer",
   "version": "0.1.0",
   "description": "Deep app analysis - framework detection, metadata extraction, and code analysis",
   "main": "./dist/index.js",

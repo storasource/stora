@@ -1,5 +1,5 @@
 /**
- * @stora/compliance - Type definitions
+ * @stora-sh/compliance - Type definitions
  */
 
 export type Platform = 'ios' | 'android' | 'both';

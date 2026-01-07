@@ -1,11 +1,11 @@
 /**
- * @stora/compliance
+ * @stora-sh/compliance
  *
  * AI-powered compliance checking for iOS App Store and Google Play.
  *
  * @example
  * ```typescript
- * import { analyzeCompliance } from '@stora/compliance';
+ * import { analyzeCompliance } from '@stora-sh/compliance';
  *
  * const result = await analyzeCompliance('./my-app', {
  *   platform: 'ios',

@@ -32,13 +32,13 @@ importers:
 
   apps/cli:
     dependencies:
-      '@stora/compliance':
+      '@stora-sh/compliance':
         specifier: workspace:*
         version: link:../../packages/compliance
-      '@stora/screenshots':
+      '@stora-sh/screenshots':
         specifier: workspace:*
         version: link:../../packages/screenshots
-      '@stora/shared':
+      '@stora-sh/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       chalk:

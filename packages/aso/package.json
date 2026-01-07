@@ -1,5 +1,5 @@
 {
-  "name": "@stora/aso",
+  "name": "@stora-sh/aso",
   "version": "0.1.0",
   "description": "App Store Optimization tools - keyword analysis, metadata optimization, and content generation",
   "main": "./dist/index.js",

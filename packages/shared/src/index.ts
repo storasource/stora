@@ -1,5 +1,5 @@
 /**
- * @stora/shared
+ * @stora-sh/shared
  *
  * Shared utilities and types for Stora packages.
  */

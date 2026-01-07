@@ -1,5 +1,5 @@
 {
-  "name": "@stora/deployment",
+  "name": "@stora-sh/deployment",
   "version": "0.1.0",
   "description": "App Store and Google Play deployment automation",
   "main": "./dist/index.js",
