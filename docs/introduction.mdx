@@ -1,0 +1,91 @@
+---
+title: Introduction
+description: "Welcome to Stora - The intelligent mobile app deployment tool"
+---
+
+# Welcome to Stora
+
+Stora is a comprehensive mobile app store automation platform that streamlines the deployment process for iOS and Android applications. Built for developers and teams, Stora automates the tedious aspects of app store submissions while maintaining quality and compliance.
+
+## What is Stora?
+
+Stora combines AI-powered screenshot automation, intelligent compliance checking, and seamless deployment workflows to help you ship mobile apps faster.
+
+<CardGroup cols={2}>
+  <Card
+    title="Screenshots"
+    icon="camera"
+    href="/screenshots/overview"
+  >
+    AI-powered agentic screenshot automation using Maestro
+  </Card>
+  <Card
+    title="Compliance"
+    icon="shield-check"
+    href="/compliance/overview"
+  >
+    Check app compliance with App Store and Play Store guidelines
+  </Card>
+  <Card
+    title="CLI"
+    icon="terminal"
+    href="/quickstart"
+  >
+    Unified command-line interface for all Stora features
+  </Card>
+  <Card
+    title="API"
+    icon="code"
+    href="/api-reference/introduction"
+  >
+    Programmatic access to all Stora capabilities
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### AI-Powered Screenshots
+
+- **Agentic Exploration**: AI automatically navigates your app and captures interesting screenshots
+- **Smart Deduplication**: Avoids capturing duplicate or similar screens
+- **Maestro Integration**: Built on the robust Maestro testing framework
+- **Cross-Platform**: Works with iOS and Android apps
+
+### Intelligent Compliance
+
+- **Rule-Based Checks**: Validates Info.plist, AndroidManifest.xml, and common issues
+- **AI Analysis**: Uses Google Gemini to discover issues that rule-based checks miss
+- **Multi-Platform**: Supports iOS, Android, or both
+- **Detailed Reporting**: Scores, grades, and prioritized recommendations
+
+## Quick Start
+
+```bash
+# Install Stora CLI
+npm install -g stora
+
+# Capture screenshots
+stora screenshots com.example.app --max-screenshots 10
+
+# Check compliance
+stora compliance ./my-app --platform ios
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start Guide"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get up and running in 5 minutes
+  </Card>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Detailed installation instructions
+  </Card>
+</CardGroup>

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Stora",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/storasource/stora"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "/quickstart"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "Documentation",
+      "icon": "book-open-cover",
+      "url": "https://docs.stora.dev"
+    },
+    {
+      "name": "Community",
+      "icon": "discord",
+      "url": "https://discord.gg/stora"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Get Started",
+      "pages": ["introduction", "quickstart", "installation"]
+    },
+    {
+      "group": "Screenshots",
+      "pages": [
+        "screenshots/overview",
+        "screenshots/agentic-mode",
+        "screenshots/cli-usage",
+        "screenshots/api"
+      ]
+    },
+    {
+      "group": "Compliance",
+      "pages": [
+        "compliance/overview",
+        "compliance/ios-checks",
+        "compliance/android-checks",
+        "compliance/ai-analysis"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/introduction",
+        "api-reference/screenshots",
+        "api-reference/compliance"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/storasource/stora",
+    "twitter": "https://twitter.com/storasource"
+  }
+}

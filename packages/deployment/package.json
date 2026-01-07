@@ -1,0 +1,43 @@
+{
+  "name": "@stora/deployment",
+  "version": "0.1.0",
+  "description": "App Store and Google Play deployment automation",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": ["deployment", "app-store", "google-play", "fastlane", "mobile"],
+  "author": "Carlton Aikins",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/storasource/stora.git",
+    "directory": "packages/deployment"
+  },
+  "dependencies": {
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.10.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

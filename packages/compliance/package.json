@@ -1,0 +1,63 @@
+{
+  "name": "@stora/compliance",
+  "version": "0.1.0",
+  "description": "AI-powered compliance checking for iOS App Store and Google Play",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "compliance",
+    "app-store",
+    "google-play",
+    "ios",
+    "android",
+    "validation",
+    "ai"
+  ],
+  "author": "Carlton Aikins",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/storasource/stora.git",
+    "directory": "packages/compliance"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^1.0.0",
+    "ai": "^4.0.0",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.10.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

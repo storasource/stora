@@ -1,0 +1,278 @@
+/**
+ * Kotlin/Android Analyzer  
+ * Analyzes native Android apps (Kotlin + Java)
+ */
+
+import fs from 'fs-extra';
+import path from 'path';
+import type { ScreenContext, WidgetInfo, WidgetAction, RouteDefinition } from '../types.js';
+
+export class KotlinAnalyzer {
+  private projectDir: string;
+
+  constructor(projectDir: string) {
+    this.projectDir = projectDir;
+  }
+
+  async analyzeScreen(filePath: string): Promise<ScreenContext> {
+    const content = await fs.readFile(filePath, 'utf-8');
+    const relativePath = path.relative(this.projectDir, filePath);
+    const fileName = path.basename(filePath, path.extname(filePath));
+
+    return {
+      name: this.extractScreenName(fileName),
+      filePath: relativePath,
+      type: 'screen',
+      widgets: this.extractWidgets(content),
+      navigation: {
+        accessibleFrom: [],
+        accessibleVia: [],
+        isInitial: fileName.toLowerCase().includes('main') || fileName.toLowerCase().includes('home'),
+        requiresAuth: fileName.toLowerCase().includes('profile'),
+      },
+      testability: {
+        hasTextElements: /setText|text\s*=/.test(content),
+        hasOnlyIcons: /ImageView|icon/.test(content) && !/setText|text\s*=/.test(content),
+        testableElements: [],
+        assertionStrategy: 'text',
+      },
+    };
+  }
+
+  private extractWidgets(content: string): WidgetInfo[] {
+    const widgets: WidgetInfo[] = [];
+    const contentWithoutDialogs = this.removeDialogContent(content);
+
+    // Extract setText() calls on TextView/Button
+    const textRegex = /(?:findViewById<TextView|findViewById<Button>)\([^)]+\)\.setText\("([^"]+)"\)/g;
+    let match;
+    while ((match = textRegex.exec(contentWithoutDialogs)) !== null) {
+      const text = match[1].trim();
+      if (text && text.length > 0 && text.length < 200) {
+        widgets.push({
+          type: 'text',
+          value: text,
+        });
+      }
+    }
+
+    // Extract Button onClick listeners
+    const buttonRegex = /(?:findViewById<Button>)\([^)]+\)\.setOnClickListener\s*{[^}]*}/g;
+    while ((match = buttonRegex.exec(contentWithoutDialogs)) !== null) {
+      // Extract button text from nearby setText or from XML parsing
+      const buttonText = this.extractButtonText(content, match.index);
+      if (buttonText) {
+        const action = this.extractButtonAction(content, buttonText);
+        widgets.push({
+          type: 'button',
+          label: buttonText,
+          action,
+        });
+      }
+    }
+
+    // Extract EditText hints
+    const editTextRegex = /(?:findViewById<EditText>)\([^)]+\)\.hint\s*=\s*"([^"]+)"/g;
+    while ((match = editTextRegex.exec(contentWithoutDialogs)) !== null) {
+      const hint = match[1].trim();
+      widgets.push({
+        type: 'input',
+        label: hint,
+      });
+    }
+
+    return widgets;
+  }
+
+  private extractButtonText(content: string, buttonIndex: number): string | undefined {
+    // Look backwards from button to find setText call
+    const beforeButton = content.substring(0, buttonIndex);
+    const textMatch = /setText\("([^"]+)"\)/.exec(beforeButton);
+    return textMatch ? textMatch[1] : undefined;
+  }
+
+  private extractButtonAction(content: string, buttonText: string): WidgetAction | undefined {
+    // Find setOnClickListener block for this button
+    const buttonBlockRegex = new RegExp(
+      `findViewById<Button>\\([^)]+\\)\\.setOnClickListener\\s*{([^{]*(?:{[^{]*})*[^}]*)}`,
+      'gs'
+    );
+
+    const match = buttonBlockRegex.exec(content);
+    if (!match) return undefined;
+
+    const clickContent = match[1];
+    return this.extractNavigationFromClick(clickContent);
+  }
+
+  private extractNavigationFromClick(clickContent: string): WidgetAction | undefined {
+    // Jetpack Navigation patterns
+    const navMatch = /findNavController[^}]*navigate\(R\.id\.(\w+)\)/.exec(clickContent);
+    if (navMatch) {
+      return {
+        type: 'navigation',
+        target: navMatch[1],
+        description: `Navigate to ${navMatch[1]}`,
+      };
+    }
+
+    // Intent-based navigation
+    const intentMatch = /Intent\(this,\s*(\w+)::class\.java\)/.exec(clickContent);
+    if (intentMatch) {
+      return {
+        type: 'navigation',
+        target: intentMatch[1],
+        description: `Start ${intentMatch[1]} activity`,
+      };
+    }
+
+    // Fragment transactions
+    const fragmentMatch = /(\w+)Fragment\(\)/.exec(clickContent);
+    if (fragmentMatch) {
+      return {
+        type: 'navigation',
+        target: fragmentMatch[1],
+        description: `Show ${fragmentMatch[1]} fragment`,
+      };
+    }
+
+    return undefined;
+  }
+
+  private removeDialogContent(content: string): string {
+    // Remove AlertDialog, DialogFragment, etc.
+    const dialogPatterns = [
+      /AlertDialog\.Builder[^}]*create\(\)/g,
+      /DialogFragment\(\)/g,
+      /show\(\)/g, // Generic show calls in dialog context
+    ];
+
+    let cleanContent = content;
+    for (const pattern of dialogPatterns) {
+      cleanContent = cleanContent.replace(pattern, '/* dialog removed */');
+    }
+
+    return cleanContent;
+  }
+
+  private extractScreenName(fileName: string): string {
+    return fileName
+      .replace(/Activity|Fragment|Screen/g, '')
+      .replace(/([A-Z])/g, ' $1')
+      .trim();
+  }
+
+  async parseRoutes(): Promise<RouteDefinition[]> {
+    const routes: RouteDefinition[] = [];
+
+    // Find navigation XML files
+    const navFiles = await this.findFiles(['**/navigation/*.xml']);
+
+    for (const file of navFiles) {
+      const content = await fs.readFile(file, 'utf-8');
+
+      // Parse navigation XML
+      const fragmentRegex = /<fragment[^>]*android:id="@\+id\/([^"]+)"[^>]*android:name="[^"]*\.(\w+)"/g;
+      let match;
+      while ((match = fragmentRegex.exec(content)) !== null) {
+        routes.push({
+          name: match[1],
+          path: match[1], // Use fragment ID as path
+          screen: match[2],
+        });
+      }
+    }
+
+    return routes;
+  }
+
+  // Additional method to parse XML layouts
+  async parseLayoutFiles(): Promise<WidgetInfo[]> {
+    const widgets: WidgetInfo[] = [];
+
+    const layoutFiles = await this.findFiles(['**/layout/*.xml']);
+
+    for (const file of layoutFiles) {
+      const content = await fs.readFile(file, 'utf-8');
+
+      // Extract TextView text
+      const textViewRegex = /<TextView[^>]*(?:android:text="([^"]+)"|android:hint="([^"]+)")/g;
+      let match;
+      while ((match = textViewRegex.exec(content)) !== null) {
+        const text = match[1] || match[2];
+        if (text) {
+          widgets.push({
+            type: 'text',
+            value: text,
+          });
+        }
+      }
+
+      // Extract Button text
+      const buttonRegex = /<Button[^>]*android:text="([^"]+)"/g;
+      while ((match = buttonRegex.exec(content)) !== null) {
+        widgets.push({
+          type: 'button',
+          label: match[1],
+        });
+      }
+
+      // Extract EditText hints
+      const editTextRegex = /<EditText[^>]*android:hint="([^"]+)"/g;
+      while ((match = editTextRegex.exec(content)) !== null) {
+        widgets.push({
+          type: 'input',
+          label: match[1],
+        });
+      }
+    }
+
+    return widgets;
+  }
+
+  private async findFiles(patterns: string[]): Promise<string[]> {
+    // Simple glob implementation for Kotlin
+    const files: string[] = [];
+    const scanDir = async (dir: string): Promise<void> => {
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+
+          if (entry.isDirectory()) {
+            if (!['build', '.git', 'gradle'].includes(entry.name)) {
+              await scanDir(fullPath);
+            }
+          } else if (entry.isFile()) {
+            const fileName = entry.name.toLowerCase();
+            if (fileName.endsWith('.kt') || fileName.endsWith('.java') || fileName.endsWith('.xml')) {
+              // Check if matches any pattern
+              for (const pattern of patterns) {
+                if (this.matchesPattern(fullPath, pattern)) {
+                  files.push(fullPath);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        // Directory doesn't exist or can't be read
+      }
+    };
+
+    await scanDir(this.projectDir);
+    return files;
+  }
+
+  private matchesPattern(filePath: string, pattern: string): boolean {
+    // Simple pattern matching
+    const relativePath = path.relative(this.projectDir, filePath);
+    return relativePath.includes(pattern.replace('**/', '').replace('*.', '.'));
+  }
+
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+}

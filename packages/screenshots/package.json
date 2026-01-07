@@ -1,0 +1,70 @@
+{
+  "name": "@stora/screenshots",
+  "version": "0.1.0",
+  "description": "AI-powered agentic screenshot automation for mobile apps using Maestro",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "stora-screenshots": "./dist/cli.js"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "screenshots",
+    "mobile",
+    "automation",
+    "maestro",
+    "ios",
+    "android",
+    "app-store",
+    "google-play",
+    "ai",
+    "agentic"
+  ],
+  "author": "Carlton Aikins",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/storasource/stora.git",
+    "directory": "packages/screenshots"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^1.0.0",
+    "ai": "^4.0.0",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "ora": "^8.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

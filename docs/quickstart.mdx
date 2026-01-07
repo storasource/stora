@@ -1,0 +1,108 @@
+---
+title: Quickstart
+description: "Get started with Stora in 5 minutes"
+---
+
+# Quickstart
+
+Get up and running with Stora in just a few minutes.
+
+## Prerequisites
+
+- Node.js 18 or higher
+- [Maestro CLI](https://maestro.mobile.dev/getting-started/installing-maestro) (for screenshots)
+- Google AI API key (for AI features)
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm install -g stora
+```
+
+```bash pnpm
+pnpm add -g stora
+```
+
+```bash yarn
+yarn global add stora
+```
+</CodeGroup>
+
+## Environment Setup
+
+Set up your API key for AI-powered features:
+
+```bash
+export GOOGLE_GENERATIVE_AI_API_KEY=your-api-key
+```
+
+## Verify Installation
+
+```bash
+stora doctor
+```
+
+This will check that all dependencies are properly installed.
+
+## Capture Screenshots
+
+With your app running on a simulator/emulator:
+
+```bash
+stora screenshots com.example.app --max-screenshots 10 --output ./screenshots
+```
+
+<Note>
+Make sure your app is installed on the device and the simulator/emulator is running.
+</Note>
+
+## Check Compliance
+
+```bash
+stora compliance ./my-app --platform ios
+```
+
+This analyzes your app and reports any compliance issues.
+
+## Example Output
+
+```
+📱 Stora - Mobile App Automation
+
+📸 Stora Screenshots
+
+Bundle ID: com.example.app
+Max steps: 50
+Max screenshots: 10
+Output: ./screenshots
+
+✅ Capture complete!
+Screenshots: 8
+Total steps: 32
+Duration: 45.2s
+
+Files:
+  - ./screenshots/screenshot-1.png
+  - ./screenshots/screenshot-2.png
+  ...
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Screenshots Guide"
+    icon="camera"
+    href="/screenshots/overview"
+  >
+    Learn more about screenshot automation
+  </Card>
+  <Card
+    title="Compliance Guide"
+    icon="shield-check"
+    href="/compliance/overview"
+  >
+    Understand compliance checking
+  </Card>
+</CardGroup>
