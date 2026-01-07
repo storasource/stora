@@ -15,7 +15,10 @@
   "bin": {
     "stora-screenshots": "./dist/cli.js"
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -44,8 +47,8 @@
     "directory": "packages/screenshots"
   },
   "dependencies": {
-    "@ai-sdk/google": "^1.0.0",
-    "ai": "^4.0.0",
+    "@ai-sdk/google": "^3.0.5",
+    "ai": "^6.0.14",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "ora": "^8.1.1"

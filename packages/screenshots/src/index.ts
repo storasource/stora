@@ -29,7 +29,7 @@ export type {
 // but we can also export its components for programmatic use
 
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateText, type CoreMessage } from 'ai';
+import { generateText, type ModelMessage } from 'ai';
 import { execSync } from 'child_process';
 import {
   writeFileSync,
@@ -306,7 +306,7 @@ export class ScreenshotManager {
  */
 export class VisionAgent {
   private google: ReturnType<typeof createGoogleGenerativeAI>;
-  private conversationHistory: CoreMessage[] = [];
+  private conversationHistory: ModelMessage[] = [];
   private model: string;
   private maxScreenshots: number;
 
@@ -367,7 +367,7 @@ Respond ONLY with JSON:
 
     const imageBuffer = Buffer.from(screenshot, 'base64');
 
-    const userMessage: CoreMessage = {
+    const userMessage: ModelMessage = {
       role: 'user',
       content: [
         {
@@ -460,8 +460,10 @@ export async function captureScreenshots(options: ScreenshotterOptions): Promise
   let steps = 0;
 
   // Launch app
+  console.log('📱 Launching app...');
   try {
     await maestro.launch();
+    console.log('✓ App launched');
   } catch (error: unknown) {
     const err = error as { message?: string };
     throw new Error(`Failed to launch app: ${err.message || 'Unknown error'}`);
@@ -472,10 +474,12 @@ export async function captureScreenshots(options: ScreenshotterOptions): Promise
   // Main exploration loop
   while (steps < config.maxSteps && screenshots.count() < config.maxScreenshots) {
     steps++;
+    console.log(`\n━━━ Step ${steps}/${config.maxSteps} ━━━`);
 
     let screenshot: string;
     let hierarchy: unknown;
 
+    console.log('👁️  Observing screen...');
     try {
       screenshot = await maestro.screenshot(
         config.saveEvalScreens ? config.evalScreensDir : undefined,
@@ -484,6 +488,7 @@ export async function captureScreenshots(options: ScreenshotterOptions): Promise
       hierarchy = await maestro.hierarchy();
     } catch (error: unknown) {
       const err = error as { message?: string };
+      console.error('❌ Observation failed:', err.message || 'Unknown error');
       errors.push(`Observation failed: ${err.message || 'Unknown error'}`);
       await sleep(2000);
       continue;
@@ -503,6 +508,7 @@ export async function captureScreenshots(options: ScreenshotterOptions): Promise
     lastScreenHash = screenHash;
 
     if (sameScreenCount > 5) {
+      console.log('⚠️  Stuck on same screen for 5 actions, forcing back');
       try {
         await maestro.back();
         lastActions.push('back (stuck)');
@@ -515,11 +521,13 @@ export async function captureScreenshots(options: ScreenshotterOptions): Promise
           await sleep(1000);
           continue;
         } catch {
+          console.log('Back failed, ending session');
           break;
         }
       }
     }
 
+    console.log('🧠 AI deciding next action...');
     let decision: AgentAction;
     try {
       decision = await agent.decide(screenshot, hierarchy, {
@@ -530,10 +538,14 @@ export async function captureScreenshots(options: ScreenshotterOptions): Promise
       });
     } catch (error: unknown) {
       const err = error as { message?: string };
+      console.error('❌ AI decision failed:', err.message || 'Unknown error');
       errors.push(`AI decision failed: ${err.message || 'Unknown error'}`);
       await sleep(2000);
       continue;
     }
+
+    console.log(`💭 ${decision.reasoning}`);
+    console.log(`🎬 ${decision.action}`, decision.params || '');
 
     try {
       switch (decision.action) {
@@ -562,12 +574,16 @@ export async function captureScreenshots(options: ScreenshotterOptions): Promise
           await sleep(1000);
           break;
         case 'screenshot':
-          if (!screenshots.isDuplicate(screenshot, hierarchy)) {
-            screenshots.save(screenshot, hierarchy);
+          if (screenshots.isDuplicate(screenshot, hierarchy)) {
+            console.log('⚠️  Duplicate screenshot, skipping');
+          } else {
+            const savedPath = screenshots.save(screenshot, hierarchy);
+            console.log(`📸 Screenshot saved: ${savedPath}`);
           }
           lastActions.push('screenshot');
           break;
         case 'done':
+          console.log("✅ AI decided we're done");
           break;
         default:
           // Handle other actions...
@@ -578,18 +594,22 @@ export async function captureScreenshots(options: ScreenshotterOptions): Promise
         const newScreenshot = await maestro.screenshot();
         const newHierarchy = await maestro.hierarchy();
         if (!screenshots.isDuplicate(newScreenshot, newHierarchy)) {
-          screenshots.save(newScreenshot, newHierarchy);
+          const savedPath = screenshots.save(newScreenshot, newHierarchy);
+          console.log(`📸 Auto-screenshot saved: ${savedPath}`);
         }
       }
 
       if (decision.action === 'done') break;
     } catch (error: unknown) {
       const err = error as { message?: string };
+      console.error(`❌ Error: ${err.message || 'Unknown error'}`);
       errors.push(`Action failed: ${err.message || 'Unknown error'}`);
       lastActions.push('error');
       await sleep(1000);
     }
   }
+
+  console.log(`\n✨ Complete! ${screenshots.count()} screenshots saved to ${config.outputDir}`);
 
   return {
     success: screenshots.count() > 0,

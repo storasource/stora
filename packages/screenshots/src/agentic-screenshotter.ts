@@ -206,7 +206,10 @@ class SimpleMaestro {
 
       if (CONFIG.saveEvalScreens && stepNumber !== undefined) {
         mkdirSync(CONFIG.evalScreensDir, { recursive: true });
-        const evalPath = path.join(CONFIG.evalScreensDir, `step-${String(stepNumber).padStart(3, '0')}-before.png`);
+        const evalPath = path.join(
+          CONFIG.evalScreensDir,
+          `step-${String(stepNumber).padStart(3, '0')}-before.png`
+        );
         copyFileSync(screenshotPath, evalPath);
       }
 
@@ -599,7 +602,10 @@ Example:
       continue;
     }
 
-    const screenHash = createHash('md5').update(JSON.stringify(hierarchy)).digest('hex').slice(0, 8);
+    const screenHash = createHash('md5')
+      .update(JSON.stringify(hierarchy))
+      .digest('hex')
+      .slice(0, 8);
     screenHistory.push(screenHash);
 
     // Check if stuck
