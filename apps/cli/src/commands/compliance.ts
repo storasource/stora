@@ -3,6 +3,20 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { analyzeCompliance } from '@stora-sh/compliance';
 
+/**
+ * Creates and configures the compliance CLI command.
+ *
+ * Builds a Commander.js command that analyzes a project directory for
+ * App Store and Play Store guideline compliance. Displays a formatted
+ * report with score, grade, and categorized issues.
+ *
+ * Available options:
+ * - `-p, --platform <platform>`: Target platform (ios, android, both)
+ * - `--no-ai`: Disable AI-powered analysis
+ * - `--strict`: Use strict checking mode
+ *
+ * @returns A configured Commander.js command for compliance checking
+ */
 export function createComplianceCommand(): Command {
   const cmd = new Command('compliance')
     .description('Check app compliance with store guidelines')

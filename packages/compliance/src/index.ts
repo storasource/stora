@@ -55,6 +55,12 @@ export {
   isAIEvaluationAvailable,
 } from './ai-evaluator.js';
 
+/**
+ * Options for compliance analysis.
+ *
+ * Extends [ComplianceConfig] with additional metadata about the app
+ * used for reporting and AI analysis context.
+ */
 export interface AnalyzeOptions extends ComplianceConfig {
   /** App name (for reporting) */
   appName?: string;
@@ -65,7 +71,33 @@ export interface AnalyzeOptions extends ComplianceConfig {
 }
 
 /**
- * Analyze app compliance with store guidelines
+ * Analyzes an app project for compliance with store guidelines.
+ *
+ * Scans the project directory for iOS Info.plist and Android Manifest
+ * configuration files, checking for common compliance issues such as
+ * missing privacy descriptions, security misconfigurations, and
+ * outdated SDK versions.
+ *
+ * When AI analysis is enabled, additionally sends app context to
+ * Google Gemini for deeper inspection that rule-based checks may miss.
+ *
+ * @param projectDir - Path to the root of the app project
+ * @param options - Configuration options for the analysis
+ * @returns A promise resolving to the compliance result with score and issues
+ *
+ * @example
+ * ```typescript
+ * const result = await analyzeCompliance('./my-app', {
+ *   platform: 'ios',
+ *   enableAI: true,
+ *   strictness: 'strict',
+ * });
+ *
+ * if (result.score < 80) {
+ *   console.log('Fix these issues before submitting:');
+ *   result.issues.forEach(issue => console.log(`- ${issue.title}`));
+ * }
+ * ```
  */
 export async function analyzeCompliance(
   projectDir: string,

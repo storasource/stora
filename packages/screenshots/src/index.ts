@@ -47,11 +47,28 @@ import * as path from 'path';
 import type { ScreenshotterOptions, AgentAction, ExecutionResult } from './types.js';
 
 /**
- * Maestro wrapper for UI automation
+ * Wraps the Maestro CLI for mobile UI automation.
+ *
+ * Provides a programmatic interface to execute Maestro commands on a running
+ * iOS Simulator or Android Emulator. Each method generates a temporary YAML
+ * flow file and executes it via the Maestro CLI.
+ *
+ * @example
+ * ```typescript
+ * const maestro = new MaestroClient('com.example.app');
+ * await maestro.launch();
+ * await maestro.tap(50, 30);
+ * const screenshot = await maestro.screenshot();
+ * ```
  */
 export class MaestroClient {
   private bundleId: string;
 
+  /**
+   * Creates a new Maestro client for the specified app.
+   *
+   * @param bundleId - The bundle identifier of the target application
+   */
   constructor(bundleId: string) {
     this.bundleId = bundleId;
   }
@@ -73,86 +90,211 @@ export class MaestroClient {
     }
   }
 
+  /**
+   * Launches the target application on the simulator or emulator.
+   *
+   * @throws Error if the app fails to launch or Maestro command times out
+   */
   async launch(): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- launchApp`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Taps at the specified screen coordinates.
+   *
+   * @param x - Horizontal position as a percentage (0-100)
+   * @param y - Vertical position as a percentage (0-100)
+   * @throws Error if the tap action fails
+   */
   async tap(x: number, y: number): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- tapOn:\n    point: ${x}%,${y}%`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Taps on an element containing the specified visible text.
+   *
+   * This is the preferred tap method when the target element has visible text,
+   * as it is more reliable than coordinate-based tapping.
+   *
+   * @param text - The visible text of the element to tap
+   * @throws Error if no element with the text is found
+   */
   async tapText(text: string): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- tapOn:\n    text: "${text}"`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Scrolls down on the current screen to reveal more content.
+   *
+   * @throws Error if the scroll action fails
+   */
   async scroll(): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- scroll`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Hides the software keyboard if currently visible.
+   *
+   * Note: This can be flaky on iOS; consider tapping outside the keyboard area
+   * as an alternative.
+   *
+   * @throws Error if the keyboard cannot be hidden
+   */
   async hideKeyboard(): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- hideKeyboard`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Navigates back using the Android back button.
+   *
+   * This is Android-only. For iOS, use [iosBackGesture] or tap a visible
+   * back button instead.
+   *
+   * @throws Error if the back action fails
+   */
   async back(): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- back`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Performs a swipe gesture from one point to another.
+   *
+   * Useful for dismissing sheets, navigating carousels, or drawing gestures.
+   *
+   * @param startX - Starting horizontal position as a percentage (0-100)
+   * @param startY - Starting vertical position as a percentage (0-100)
+   * @param endX - Ending horizontal position as a percentage (0-100)
+   * @param endY - Ending vertical position as a percentage (0-100)
+   * @throws Error if the swipe action fails
+   */
   async swipe(startX: number, startY: number, endX: number, endY: number): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- swipe:\n    start: "${startX}%, ${startY}%"\n    end: "${endX}%, ${endY}%"`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Performs a double-tap gesture at the specified coordinates.
+   *
+   * @param x - Horizontal position as a percentage (0-100)
+   * @param y - Vertical position as a percentage (0-100)
+   * @throws Error if the double-tap action fails
+   */
   async doubleTap(x: number, y: number): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- doubleTapOn:\n    point: ${x}%,${y}%`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Performs a long press gesture at the specified coordinates.
+   *
+   * @param x - Horizontal position as a percentage (0-100)
+   * @param y - Vertical position as a percentage (0-100)
+   * @throws Error if the long press action fails
+   */
   async longPress(x: number, y: number): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- longPressOn:\n    point: ${x}%,${y}%`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Performs a long press gesture on an element with the specified text.
+   *
+   * @param text - The visible text of the element to long press
+   * @throws Error if no element with the text is found
+   */
   async longPressText(text: string): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- longPressOn:\n    text: "${text}"`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Types text into the currently focused input field.
+   *
+   * @param text - The text to input
+   * @throws Error if no input field is focused or typing fails
+   */
   async inputText(text: string): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- inputText: "${text}"`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Erases characters from the currently focused input field.
+   *
+   * @param chars - Number of characters to erase (default: 50)
+   * @throws Error if no input field is focused or erasing fails
+   */
   async eraseText(chars: number = 50): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- eraseText: ${chars}`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Opens a URL or deep link in the app.
+   *
+   * @param url - The URL or deep link to open
+   * @throws Error if the link cannot be opened
+   */
   async openLink(url: string): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- openLink: ${url}`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Presses a special key on the device.
+   *
+   * Supported keys include: enter, home, backspace, volume up, volume down,
+   * lock, tab. Note: back and power are Android-only.
+   *
+   * @param key - The key to press
+   * @throws Error if the key press fails
+   */
   async pressKey(key: string): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- pressKey: ${key}`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Waits for animations to complete before proceeding.
+   *
+   * @param timeout - Maximum time to wait in milliseconds (default: 3000)
+   * @throws Error if the wait times out
+   */
   async waitForAnimation(timeout: number = 3000): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- waitForAnimationToEnd:\n    timeout: ${timeout}`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Performs an iOS-style back gesture by swiping from the left edge.
+   *
+   * Use this as an alternative to [back] on iOS devices, which do not
+   * support the Android back button.
+   *
+   * @throws Error if the swipe gesture fails
+   */
   async iosBackGesture(): Promise<void> {
     const yaml = `appId: ${this.bundleId}\n---\n- swipe:\n    start: "1%, 50%"\n    end: "80%, 50%"`;
     this.runFlow(yaml);
   }
 
+  /**
+   * Captures a screenshot of the current screen.
+   *
+   * Returns the screenshot as a base64-encoded PNG string. Optionally saves
+   * a copy to the specified output directory for debugging purposes.
+   *
+   * @param outputDir - Optional directory to save a copy of the screenshot
+   * @param stepNumber - Optional step number for naming the saved file
+   * @returns A promise resolving to the base64-encoded PNG image
+   * @throws Error if the screenshot capture fails
+   */
   async screenshot(outputDir?: string, stepNumber?: number): Promise<string> {
     const timestamp = Date.now();
     const name = `screen-${timestamp}`;
@@ -204,6 +346,16 @@ export class MaestroClient {
     }
   }
 
+  /**
+   * Retrieves the current UI element hierarchy from the screen.
+   *
+   * Returns a JSON object representing the tree structure of all visible
+   * UI elements, including their text, bounds, and accessibility properties.
+   * Used by the AI agent to understand screen content and make decisions.
+   *
+   * @returns A promise resolving to the UI hierarchy as a JSON object
+   * @throws Error if the hierarchy retrieval fails
+   */
   async hierarchy(): Promise<unknown> {
     try {
       const output = execSync('maestro hierarchy', {
@@ -226,12 +378,31 @@ export class MaestroClient {
 }
 
 /**
- * Screenshot manager for deduplication and storage
+ * Manages screenshot storage with deduplication.
+ *
+ * Handles saving captured screenshots to disk while avoiding duplicates
+ * using MD5 hash comparison. Maintains an index of all saved screenshots
+ * for retrieval after the capture session completes.
+ *
+ * @example
+ * ```typescript
+ * const manager = new ScreenshotManager('./screenshots');
+ * if (!manager.isDuplicate(base64Image, hierarchy)) {
+ *   const path = manager.save(base64Image, hierarchy);
+ * }
+ * ```
  */
 export class ScreenshotManager {
   private screenshots: Array<{ path: string; hash: string; screenHash: string }> = [];
   private outputDir: string;
 
+  /**
+   * Creates a new screenshot manager.
+   *
+   * Creates the output directory if it does not exist.
+   *
+   * @param outputDir - Directory path where screenshots will be saved
+   */
   constructor(outputDir: string) {
     this.outputDir = outputDir;
     mkdirSync(outputDir, { recursive: true });
@@ -273,11 +444,30 @@ export class ScreenshotManager {
     return texts;
   }
 
+  /**
+   * Checks whether a screenshot is a duplicate of one already saved.
+   *
+   * Uses MD5 hash comparison of the image content to detect exact duplicates.
+   *
+   * @param screenshot - Base64-encoded PNG image to check
+   * @param _hierarchy - UI hierarchy (currently unused, reserved for future use)
+   * @returns True if the screenshot is a duplicate, false otherwise
+   */
   isDuplicate(screenshot: string, _hierarchy: unknown): boolean {
     const imageHash = this.hashImage(screenshot);
     return this.screenshots.some((s) => s.hash === imageHash);
   }
 
+  /**
+   * Saves a screenshot to the output directory.
+   *
+   * Writes the image to disk with an incrementing filename and records
+   * metadata for deduplication and retrieval.
+   *
+   * @param screenshot - Base64-encoded PNG image to save
+   * @param hierarchy - UI hierarchy for computing the screen hash
+   * @returns The file path where the screenshot was saved
+   */
   save(screenshot: string, hierarchy: unknown): string {
     const imageHash = this.hashImage(screenshot);
     const screenHash = this.hashHierarchy(hierarchy);
@@ -292,17 +482,38 @@ export class ScreenshotManager {
     return filepath;
   }
 
+  /**
+   * Returns the number of screenshots saved so far.
+   *
+   * @returns The count of saved screenshots
+   */
   count(): number {
     return this.screenshots.length;
   }
 
+  /**
+   * Returns all saved screenshot file paths.
+   *
+   * @returns An array of file paths to the saved screenshots
+   */
   getAll(): string[] {
     return this.screenshots.map((s) => s.path);
   }
 }
 
 /**
- * Vision agent for AI-powered exploration decisions
+ * AI-powered vision agent for autonomous app exploration.
+ *
+ * Analyzes screenshots using Google Gemini to decide what actions to take
+ * for capturing high-quality App Store screenshots. Maintains conversation
+ * history for context-aware decision making across multiple steps.
+ *
+ * @example
+ * ```typescript
+ * const agent = new VisionAgent(apiKey);
+ * const action = await agent.decide(screenshot, hierarchy, context);
+ * // action.action = 'tap', action.params = { x: 50, y: 30 }
+ * ```
  */
 export class VisionAgent {
   private google: ReturnType<typeof createGoogleGenerativeAI>;
@@ -310,12 +521,36 @@ export class VisionAgent {
   private model: string;
   private maxScreenshots: number;
 
+  /**
+   * Creates a new vision agent.
+   *
+   * @param apiKey - Google AI API key for Gemini access
+   * @param model - Model identifier to use (default: gemini-2.0-flash)
+   * @param maxScreenshots - Target number of screenshots to inform the agent
+   */
   constructor(apiKey: string, model: string = 'gemini-2.0-flash', maxScreenshots: number = 10) {
     this.google = createGoogleGenerativeAI({ apiKey });
     this.model = model;
     this.maxScreenshots = maxScreenshots;
   }
 
+  /**
+   * Analyzes the current screen and decides the next action to take.
+   *
+   * Sends the screenshot to Google Gemini for vision analysis along with
+   * contextual information about the exploration state. Returns a structured
+   * action decision including the action type, parameters, and reasoning.
+   *
+   * @param screenshot - Base64-encoded PNG of the current screen
+   * @param hierarchy - UI element hierarchy for context
+   * @param context - Current exploration state including screenshots taken
+   * @param context.screenshotsTaken - Number of screenshots captured so far
+   * @param context.screenHistory - Hashes of previously visited screens
+   * @param context.lastActions - Recent actions taken for context
+   * @param context.stuckCount - How many times the same screen was visited
+   * @returns A promise resolving to the agent's action decision
+   * @throws Error if the AI response cannot be parsed or the API call fails
+   */
   async decide(
     screenshot: string,
     hierarchy: unknown,
@@ -420,10 +655,33 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Main function to capture screenshots using agentic exploration
+ * Captures App Store-ready screenshots using AI-powered exploration.
  *
- * @param options Configuration options
- * @returns Execution result with screenshot paths and metadata
+ * Launches the target app and uses an AI vision agent to autonomously
+ * navigate and capture screenshots of interesting content. The agent
+ * avoids empty states, loading screens, and duplicate captures.
+ *
+ * Requires Maestro CLI to be installed and a running iOS Simulator or
+ * Android Emulator with the target app installed.
+ *
+ * @param options - Configuration options for the capture session
+ * @returns A promise resolving to the execution result with captured screenshots
+ * @throws Error if the Google API key is not configured
+ * @throws Error if the app fails to launch
+ *
+ * @example
+ * ```typescript
+ * const result = await captureScreenshots({
+ *   bundleId: 'com.example.app',
+ *   maxScreenshots: 10,
+ *   outputDir: './screenshots',
+ * });
+ *
+ * if (result.success) {
+ *   console.log(`Captured ${result.screenshotCount} screenshots`);
+ *   result.screenshots.forEach(path => console.log(path));
+ * }
+ * ```
  */
 export async function captureScreenshots(options: ScreenshotterOptions): Promise<ExecutionResult> {
   const startTime = Date.now();
