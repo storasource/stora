@@ -4,7 +4,7 @@
 
 import fs from 'fs-extra';
 import path from 'path';
-import type { AnalyzedFile } from '../../../types/index.js';
+import type { AnalyzedFile } from '../index.js';
 
 interface ReactNativeMetadata {
   name: string | null;

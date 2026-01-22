@@ -22,6 +22,7 @@ export interface DetectedFeature {
   name: string;
   type: string;
   confidence: number;
+  evidence?: string[];
 }
 
 export interface DependencyInfo {
@@ -42,6 +43,8 @@ export interface Warning {
 export interface AnalyzedFile {
   path: string;
   type: string;
+  purpose?: string;
+  exists?: boolean;
 }
 
 export interface ConfidenceScore {

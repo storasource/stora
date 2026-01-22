@@ -4,7 +4,7 @@
 
 import fs from 'fs-extra';
 import path from 'path';
-import type { DetectedFeature } from '../../types/index.js';
+import type { DetectedFeature } from './index.js';
 
 interface FeaturePattern {
   name: string;
@@ -115,6 +115,7 @@ export async function detectPatterns(projectDir: string, fileTree: string[]): Pr
     if (confidence > 0) {
       features.push({
         name: pattern.name,
+        type: 'feature',
         confidence: Math.min(confidence, 1),
         evidence: evidence.slice(0, 3),
       });

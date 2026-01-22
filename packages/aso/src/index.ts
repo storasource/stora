@@ -8,6 +8,7 @@ export interface AppMetadata {
   name: string;
   description: string;
   keywords?: string;
+  category?: string;
 }
 
 export interface ASOResult {

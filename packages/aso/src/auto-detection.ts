@@ -6,7 +6,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { z } from 'zod';
-import { deepScan } from '../deep-scan/index.js';
+import { deepScan } from '@stora-sh/analyzer';
 import { GeminiClient } from './ai/gemini-client.js';
 import { categoryClassificationPrompt } from './ai/prompts/category-prompts.js';
 import { IOS_CATEGORIES, ANDROID_CATEGORIES } from './types.js';
