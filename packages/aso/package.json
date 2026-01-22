@@ -38,11 +38,19 @@
     "directory": "packages/aso"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.2.0",
     "@ai-sdk/google": "^1.0.0",
+    "@ai-sdk/openai": "^1.2.0",
+    "@stora-sh/analyzer": "workspace:*",
     "ai": "^4.0.0",
+    "app-store-scraper": "^0.18.0",
+    "fs-extra": "^11.2.0",
+    "google-play-scraper": "^9.1.1",
+    "keyword-extractor": "^0.0.28",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.10.2",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2"

@@ -14,6 +14,12 @@ import type {
   ComplianceEvaluationContext,
 } from './types.js';
 
+/**
+ * Configuration options for AI-powered compliance evaluation.
+ *
+ * Controls the AI model selection and provides hooks for progress updates
+ * during the analysis process.
+ */
 export interface AIEvaluatorOptions {
   /** Use Gemini Pro for maximum quality (default: false, uses Flash) */
   usePro?: boolean;
@@ -41,7 +47,28 @@ Respond with a JSON object containing:
 - estimatedApprovalLikelihood: A number 0-100`;
 
 /**
- * Evaluate compliance using AI for deep analysis
+ * Performs deep compliance analysis using Google Gemini.
+ *
+ * Sends the app context to Gemini for AI-powered analysis that can discover
+ * compliance issues that rule-based checks might miss. Analyzes privacy
+ * policies, permission usage, SDK integrations, and platform-specific
+ * guidelines.
+ *
+ * Requires the `GOOGLE_GENERATIVE_AI_API_KEY` environment variable to be set.
+ *
+ * @param context - Comprehensive app information and existing issues
+ * @param options - Configuration for model selection and progress callbacks
+ * @returns A promise resolving to discovered issues and recommendations
+ * @throws Error if the API key is not set or the API call fails
+ *
+ * @example
+ * ```typescript
+ * const result = await evaluateComplianceWithAI(context, {
+ *   usePro: true,
+ *   onProgress: (msg) => console.log(msg),
+ * });
+ * console.log(`AI found ${result.discoveredIssues.length} new issues`);
+ * ```
  */
 export async function evaluateComplianceWithAI(
   context: ComplianceEvaluationContext,
@@ -208,14 +235,37 @@ function mapAISeverity(severity: string): Severity {
 }
 
 /**
- * Check if AI evaluation is available
+ * Checks whether AI-powered evaluation is available.
+ *
+ * Returns true if the `GOOGLE_GENERATIVE_AI_API_KEY` environment variable
+ * is set. Use this to conditionally enable AI features in the UI.
+ *
+ * @returns True if the Google AI API key is configured, false otherwise
  */
 export function isAIEvaluationAvailable(): boolean {
   return !!process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 }
 
 /**
- * Build evaluation context from app info
+ * Builds the evaluation context for AI analysis.
+ *
+ * Combines app metadata, analysis results, and existing issues into a
+ * structured context object that can be sent to the AI evaluator.
+ *
+ * @param appInfo - Basic app information including name, version, and platforms
+ * @param analysisData - Results from static analysis including permissions and SDKs
+ * @param existingIssues - Issues already found by rule-based checks
+ * @param configSnippets - Optional configuration file excerpts for deeper analysis
+ * @returns A [ComplianceEvaluationContext] ready for AI evaluation
+ *
+ * @example
+ * ```typescript
+ * const context = buildEvaluationContext(
+ *   { name: 'MyApp', version: '1.0', framework: 'react-native', platforms: ['ios'] },
+ *   { hasPrivacyPolicy: true, permissions: { ios: ['camera'] } },
+ *   existingIssues
+ * );
+ * ```
  */
 export function buildEvaluationContext(
   appInfo: {

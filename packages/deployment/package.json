@@ -38,10 +38,15 @@
     "directory": "packages/deployment"
   },
   "dependencies": {
-    "fs-extra": "^11.2.0"
+    "axios": "^1.7.9",
+    "fs-extra": "^11.2.0",
+    "google-auth-library": "^9.15.1",
+    "googleapis": "^144.0.0",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
+    "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.2",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2"

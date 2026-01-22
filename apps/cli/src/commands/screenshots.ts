@@ -3,6 +3,23 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { captureScreenshots } from '@stora-sh/screenshots';
 
+/**
+ * Creates and configures the screenshots CLI command.
+ *
+ * Builds a Commander.js command that accepts a bundle ID and options for
+ * controlling the AI-powered screenshot capture process. Validates that
+ * the Google AI API key is set before proceeding.
+ *
+ * Available options:
+ * - `--max-steps <n>`: Maximum exploration steps (default: 50)
+ * - `--max-screenshots <n>`: Target screenshot count (default: 10)
+ * - `--output <path>`: Output directory (default: ./store-screenshots)
+ * - `--save-eval`: Save evaluation screenshots for debugging
+ * - `--eval-dir <path>`: Evaluation screenshots directory
+ * - `--model <model>`: AI model to use (default: gemini-2.0-flash)
+ *
+ * @returns A configured Commander.js command for screenshot capture
+ */
 export function createScreenshotsCommand(): Command {
   const cmd = new Command('screenshots')
     .description('AI-powered screenshot automation using Maestro')

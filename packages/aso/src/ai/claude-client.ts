@@ -65,7 +65,7 @@ export class ClaudeClient {
         schema,
         prompt,
         temperature: options?.temperature ?? 0.7,
-        maxOutputTokens: options?.maxTokens,
+        maxTokens: options?.maxTokens,
       });
 
       return object as T;
@@ -90,7 +90,7 @@ export class ClaudeClient {
         model: this.getModel(options?.useOpus) as any,
         prompt,
         temperature: options?.temperature ?? 0.7,
-        maxOutputTokens: options?.maxTokens,
+        maxTokens: options?.maxTokens,
       });
 
       return text;

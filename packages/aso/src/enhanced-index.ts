@@ -19,7 +19,7 @@ import type {
   TitleSuggestion,
   DescriptionSuggestion,
   KeywordSuggestion,
-} from '../../types/index.js';
+} from './index.js';
 
 export interface EnhancedOptimizeOptions {
   projectDir: string;

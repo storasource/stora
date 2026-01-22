@@ -31,7 +31,7 @@ export class AppStoreScraper {
             lang: options.language || 'en',
           });
           
-          return results.map(app => this.mapToCompetitorApp(app));
+          return results.map((app: any) => this.mapToCompetitorApp(app));
         } catch (error) {
           console.error(`App Store search failed for "${options.query}":`, error);
           return [];
@@ -91,7 +91,7 @@ export class AppStoreScraper {
           
           return similar
             .slice(0, options?.limit || 10)
-            .map(app => this.mapToCompetitorApp(app));
+            .map((app: any) => this.mapToCompetitorApp(app));
         } catch (error) {
           console.error(`Failed to fetch similar apps for ${appId}:`, error);
           return [];
@@ -123,7 +123,7 @@ export class AppStoreScraper {
             lang: options.language || 'en',
           });
           
-          return apps.map(app => this.mapToCompetitorApp(app));
+          return apps.map((app: any) => this.mapToCompetitorApp(app));
         } catch (error) {
           console.error(`Failed to fetch top apps:`, error);
           return [];
@@ -152,7 +152,7 @@ export class AppStoreScraper {
             lang: options?.language || 'en',
           });
           
-          return apps.map(app => this.mapToCompetitorApp(app));
+          return apps.map((app: any) => this.mapToCompetitorApp(app));
         } catch (error) {
           console.error(`Failed to fetch developer apps for ${developerId}:`, error);
           return [];

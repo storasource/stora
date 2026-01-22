@@ -16,6 +16,11 @@ import * as path from 'path';
 // CLI Argument Parsing
 // ============================================================================
 
+/**
+ * Parse command-line arguments
+ * @return {object} Parsed arguments
+ * 
+ */
 function parseArgs(): {
   bundleId: string;
   maxSteps: number;
