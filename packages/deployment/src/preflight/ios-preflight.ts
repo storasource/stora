@@ -14,16 +14,46 @@
 
 import { AppStoreConnectService } from '../services/app-store-connect.js';
 import type { ASCCredentials, ASCBundleId, ASCAppInfo } from '../services/types.js';
-import {
-  getXcodeProjectInfo,
-  hasAutomaticSigning,
-  configureAutomaticSigning,
-  isValidTeamId,
-} from '../../build/utils/xcode-config.js';
-import {
-  validateAppIcons,
-  removeAlphaFromIcons,
-} from '../../build/utils/asset-validator.js';
+
+// Stub implementations for xcode-config utilities (build package not yet implemented)
+interface XcodeProjectInfo {
+  hasTeamId: boolean;
+  teamId?: string;
+}
+
+async function getXcodeProjectInfo(_projectDir: string): Promise<XcodeProjectInfo | null> {
+  // TODO: Implement when @stora/build package is available
+  return null;
+}
+
+async function configureAutomaticSigning(_projectDir: string, _teamId: string): Promise<void> {
+  // TODO: Implement when @stora/build package is available
+  throw new Error('Automatic signing configuration not yet implemented');
+}
+
+// Stub implementations for asset-validator utilities (build package not yet implemented)
+interface IconValidationResult {
+  valid: boolean;
+  hasAlphaChannel?: boolean;
+  iconsWithAlpha: string[];
+  missingIcons: string[];
+  wrongDimensions: Array<{ file: string; expected: string; actual: string }>;
+}
+
+async function validateAppIcons(_projectDir: string): Promise<IconValidationResult> {
+  // TODO: Implement when @stora/build package is available
+  return {
+    valid: true,
+    iconsWithAlpha: [],
+    missingIcons: [],
+    wrongDimensions: [],
+  };
+}
+
+async function removeAlphaFromIcons(_projectDir: string): Promise<string[]> {
+  // TODO: Implement when @stora/build package is available
+  return [];
+}
 
 export interface IOSPreflightResult {
   passed: boolean;

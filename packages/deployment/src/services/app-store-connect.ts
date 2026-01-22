@@ -4,7 +4,7 @@
  */
 
 import jwt from 'jsonwebtoken';
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import fs from 'fs-extra';
 import path from 'path';
 import { execSync } from 'child_process';
@@ -135,7 +135,7 @@ export class AppStoreConnectService {
     });
 
     // Add request interceptor to add auth token
-    this.client.interceptors.request.use(async (config) => {
+    this.client.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
       const token = await this.getAuthToken();
       config.headers.Authorization = `Bearer ${token}`;
       return config;
