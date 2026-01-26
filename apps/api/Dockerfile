@@ -8,20 +8,22 @@ RUN npm install -g pnpm
 FROM base AS builder
 WORKDIR /app
 COPY . .
-# We assume we are running from the app directory context in Railway/Render
-# If running from monorepo root, adjust paths accordingly. 
-# For simple app deployment, we copy the specific app source.
 WORKDIR /app/stora/apps/api
-RUN pnpm install
+# Force independent install to ensure local node_modules
+RUN pnpm install --config.recursive-install=false
 RUN pnpm build
 
 # Runner stage
 FROM base AS runner
 WORKDIR /app
 
+# Copy package.json and install PROD dependencies only
 COPY --from=builder /app/stora/apps/api/package.json .
+# Use npm for final install to avoid pnpm workspace complexity in final image
+RUN npm install --omit=dev
+
+# Copy built artifacts
 COPY --from=builder /app/stora/apps/api/dist ./dist
-COPY --from=builder /app/stora/apps/api/node_modules ./node_modules
 
 ENV NODE_ENV=production
 ENV PORT=3000
