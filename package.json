@@ -1,7 +1,7 @@
 {
-  "name": "stora",
+  "name": "stora-sh",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "description": "Mobile app store automation platform - Screenshots, ASO, Compliance, and Deployment",
   "author": "Carlton Aikins",
   "license": "MIT",
@@ -36,7 +36,12 @@
     "typescript": "^5.7.2"
   },
   "lint-staged": {
-    "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
-    "*.{json,md}": ["prettier --write"]
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   }
 }

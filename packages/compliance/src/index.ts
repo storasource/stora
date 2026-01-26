@@ -55,6 +55,12 @@ export {
   isAIEvaluationAvailable,
 } from './ai-evaluator.js';
 
+// Re-export dynamic compliance testing
+export * from './dynamic';
+export * from './observers';
+export * from './vision';
+export * from './rules';
+
 export interface AnalyzeOptions extends ComplianceConfig {
   /** App name (for reporting) */
   appName?: string;

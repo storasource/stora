@@ -2,6 +2,8 @@
  * @stora-sh/screenshots - Type definitions
  */
 
+export type MobilePlatform = 'flutter' | 'react-native' | 'expo' | 'swift' | 'kotlin';
+
 export interface ScreenshotterOptions {
   /** Target bundle ID of the app */
   bundleId: string;
@@ -19,6 +21,20 @@ export interface ScreenshotterOptions {
   googleApiKey?: string;
   /** Model to use (default: gemini-2.0-flash) */
   model?: string;
+  /** Device name to use (e.g., "iPhone 15 Pro"). If provided, will boot simulator. */
+  device?: string;
+  /** Platform: ios or android (default: ios) */
+  platform?: 'ios' | 'android';
+  /** GitHub clone URL with embedded access token for cloning the repo */
+  repoUrl?: string;
+  /** Mobile platform type for build process */
+  mobilePlatform?: MobilePlatform;
+  /** Whether to auto-build and install the app before capture (default: true if repoUrl provided) */
+  autoBuild?: boolean;
+  /** Session ID for process tracking and interactive input */
+  sessionId?: string;
+  /** Callback when CLI prompts for user input */
+  onPrompt?: (prompt: string) => void;
 }
 
 export interface ScreenshotResult {
@@ -34,6 +50,8 @@ export interface AgentAction {
   action:
     | 'tap'
     | 'tapText'
+    | 'tapElementById'
+    | 'tapResourceId'
     | 'doubleTap'
     | 'longPress'
     | 'scroll'
@@ -50,6 +68,19 @@ export interface AgentAction {
   params?: Record<string, unknown>;
   reasoning: string;
   shouldScreenshot: boolean;
+}
+
+export interface EnhancedContext {
+  screenshot: string;
+  annotatedScreenshot: string;
+  hierarchy: unknown;
+  parsedHierarchy: {
+    totalElements: number;
+    interactiveCount: number;
+    semanticsCoverage: number;
+    platform: 'ios' | 'android' | 'unknown';
+  };
+  elementList: string;
 }
 
 export interface ExecutionResult {

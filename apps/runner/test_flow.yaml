@@ -1,0 +1,7 @@
+appId: com.apple.Preferences
+---
+- startRecording: session_replay
+- launchApp
+- tapOn: "General"
+- assertVisible: "About"
+- stopRecording

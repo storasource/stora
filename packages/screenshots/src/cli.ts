@@ -25,7 +25,7 @@ program
   .option('--output-dir <path>', 'Directory for screenshots', './store-screenshots')
   .option('--save-eval-screens', 'Save evaluation screenshots for debugging')
   .option('--eval-screens-dir <path>', 'Directory for eval screenshots', './eval-screens')
-  .option('--model <model>', 'AI model to use', 'gemini-2.0-flash')
+  .option('--model <model>', 'AI model to use', 'gemini-3.0-pro-preview')
   .action(async (bundleId: string, options) => {
     console.log(chalk.bold.blue('\n📸 Stora Screenshots - AI-Powered Capture\n'));
 

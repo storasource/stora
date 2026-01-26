@@ -75,7 +75,7 @@ await maestro.tap(50, 50);
 const screenshot = await maestro.screenshot();
 
 // AI decision making
-const agent = new VisionAgent(apiKey, 'gemini-2.0-flash', 10);
+const agent = new VisionAgent(apiKey, 'gemini-3.0-pro-preview', 10);
 const decision = await agent.decide(screenshot, hierarchy, context);
 
 // Screenshot management with deduplication
@@ -93,16 +93,16 @@ Main function for AI-powered screenshot capture.
 
 **Options:**
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `bundleId` | string | required | Bundle ID of the target app |
-| `maxSteps` | number | 50 | Maximum exploration steps |
-| `maxScreenshots` | number | 10 | Target number of screenshots |
-| `outputDir` | string | ./store-screenshots | Output directory |
-| `saveEvalScreens` | boolean | false | Save evaluation screenshots |
-| `evalScreensDir` | string | ./eval-screens | Evaluation screenshots directory |
-| `model` | string | gemini-2.0-flash | AI model to use |
-| `googleApiKey` | string | env var | Google AI API key |
+| Option            | Type    | Default                | Description                      |
+| ----------------- | ------- | ---------------------- | -------------------------------- |
+| `bundleId`        | string  | required               | Bundle ID of the target app      |
+| `maxSteps`        | number  | 50                     | Maximum exploration steps        |
+| `maxScreenshots`  | number  | 10                     | Target number of screenshots     |
+| `outputDir`       | string  | ./store-screenshots    | Output directory                 |
+| `saveEvalScreens` | boolean | false                  | Save evaluation screenshots      |
+| `evalScreensDir`  | string  | ./eval-screens         | Evaluation screenshots directory |
+| `model`           | string  | gemini-3.0-pro-preview | AI model to use                  |
+| `googleApiKey`    | string  | env var                | Google AI API key                |
 
 **Returns:** `Promise<ExecutionResult>`
 
@@ -124,15 +124,15 @@ Wrapper for Maestro UI automation.
 ```typescript
 const maestro = new MaestroClient(bundleId);
 
-await maestro.launch();           // Launch the app
-await maestro.tap(x, y);          // Tap at percentage coordinates
-await maestro.tapText(text);      // Tap element with text
-await maestro.scroll();           // Scroll down
-await maestro.back();             // Go back (Android)
-await maestro.swipe(x1, y1, x2, y2);  // Swipe gesture
-await maestro.inputText(text);    // Type text
-await maestro.screenshot();       // Take screenshot (returns base64)
-await maestro.hierarchy();        // Get UI hierarchy
+await maestro.launch(); // Launch the app
+await maestro.tap(x, y); // Tap at percentage coordinates
+await maestro.tapText(text); // Tap element with text
+await maestro.scroll(); // Scroll down
+await maestro.back(); // Go back (Android)
+await maestro.swipe(x1, y1, x2, y2); // Swipe gesture
+await maestro.inputText(text); // Type text
+await maestro.screenshot(); // Take screenshot (returns base64)
+await maestro.hierarchy(); // Get UI hierarchy
 ```
 
 ### `VisionAgent`
@@ -153,10 +153,10 @@ Manages screenshot storage with deduplication.
 ```typescript
 const manager = new ScreenshotManager(outputDir);
 
-manager.isDuplicate(screenshot, hierarchy);  // Check if duplicate
-manager.save(screenshot, hierarchy);         // Save screenshot
-manager.count();                             // Get count
-manager.getAll();                            // Get all paths
+manager.isDuplicate(screenshot, hierarchy); // Check if duplicate
+manager.save(screenshot, hierarchy); // Save screenshot
+manager.count(); // Get count
+manager.getAll(); // Get all paths
 ```
 
 ## How It Works

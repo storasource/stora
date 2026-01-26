@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="iPhone 17 Pro - iOS 26.0 - 8F05B502-48B2-4212-A6E8-53A8DF18ABF6" tests="1" failures="0" time="7.0">
+    <testcase id="test_flow" name="test_flow" classname="test_flow" time="7.0" status="SUCCESS"/>
+  </testsuite>
+</testsuites>
