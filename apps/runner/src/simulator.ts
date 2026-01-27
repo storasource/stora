@@ -6,7 +6,7 @@ export class SimulatorManager {
    * Boots a simulator with the given device type and runtime.
    * If a simulator is already booted, it returns its UDID.
    */
-  async boot(deviceType: string = 'iPhone 17 Pro', runtime: string = 'iOS 17.2'): Promise<string> {
+  async boot(deviceType: string = 'iPhone 16 Pro', runtime: string = 'iOS 17.2'): Promise<string> {
     console.log(chalk.blue(`[Simulator] checking for ${deviceType}...`));
     
     // Check if already booted
@@ -25,7 +25,7 @@ export class SimulatorManager {
     // Find available device to boot
     console.log(chalk.yellow(`[Simulator] Booting ${deviceType}...`));
     // Note: In a real robust system, we'd lookup the UDID from 'xcrun simctl list' first.
-    // For now, we assume 'iPhone 17 Pro' is a valid alias if the runtime matches.
+    // For now, we assume 'iPhone 16 Pro' is a valid alias if the runtime matches.
     
     try {
       const { stdout: udid } = await execa('xcrun', ['simctl', 'bootstatus', deviceType, '-b']);
