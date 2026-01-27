@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import chalk from 'chalk';
+import './redis';
 
 const PORT = process.env.PORT || 3001;
 
@@ -19,6 +20,31 @@ const io = new Server(httpServer, {
 
 // Store connected runners
 const runners = new Map<string, string>(); // runnerId -> socketId
+
+// Token validation middleware
+const ORCHESTRATOR_TOKEN = process.env.ORCHESTRATOR_TOKEN;
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  
+  if (!ORCHESTRATOR_TOKEN) {
+    console.error(chalk.red('[Auth] ORCHESTRATOR_TOKEN not configured'));
+    return next(new Error('Server token not configured'));
+  }
+  
+  if (!token) {
+    console.error(chalk.red('[Auth] Connection rejected: missing token'));
+    return next(new Error('Authentication token required'));
+  }
+  
+  if (token !== ORCHESTRATOR_TOKEN) {
+    console.error(chalk.red('[Auth] Connection rejected: invalid token'));
+    return next(new Error('Invalid authentication token'));
+  }
+  
+  console.log(chalk.green('[Auth] Token validated successfully'));
+  next();
+});
 
 io.on('connection', (socket) => {
   const { type, runnerId } = socket.handshake.query;

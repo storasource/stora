@@ -9,12 +9,14 @@ import chalk from 'chalk';
 // --- CONFIG ---
 const API_URL = process.env.API_URL || 'http://localhost:3001'; 
 const RUNNER_ID = process.env.RUNNER_ID || 'local-mac-runner';
+const ORCHESTRATOR_TOKEN = process.env.ORCHESTRATOR_TOKEN;
 const WORK_DIR = path.join(process.cwd(), 'temp');
 
 // --- SETUP ---
 const socket = io(API_URL, {
   autoConnect: false,
-  query: { runnerId: RUNNER_ID, type: 'runner' }
+  query: { runnerId: RUNNER_ID, type: 'runner' },
+  auth: { token: ORCHESTRATOR_TOKEN }
 });
 
 const sim = new SimulatorManager();
@@ -84,7 +86,7 @@ async function runLocalJob(appPath: string, flowPath: string, jobId: string | nu
     console.log(chalk.cyan(`[Local] Running job with App: ${appPath} Flow: ${flowPath}`));
     
     // Boot Simulator
-    const udid = await sim.boot('iPhone 17 Pro');
+    const udid = await sim.boot('iPhone 16 Pro');
     
     // Install App
     if (appPath.endsWith('.app') || appPath.endsWith('.zip')) {
