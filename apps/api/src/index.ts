@@ -3,7 +3,14 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import chalk from 'chalk';
-import './redis';
+import './redis.js';
+import { 
+  addScreenshotJob, 
+  createScreenshotWorker, 
+  setJobState, 
+  ScreenshotJobData,
+  Job
+} from './queue.js';
 
 const PORT = process.env.PORT || 3001;
 
@@ -13,15 +20,13 @@ app.use(cors());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "*", // Allow all for dev
+    origin: "*",
     methods: ["GET", "POST"]
   }
 });
 
-// Store connected runners
-const runners = new Map<string, string>(); // runnerId -> socketId
+const runners = new Map<string, string>();
 
-// Token validation middleware
 const ORCHESTRATOR_TOKEN = process.env.ORCHESTRATOR_TOKEN;
 
 io.use((socket, next) => {
@@ -46,6 +51,24 @@ io.use((socket, next) => {
   next();
 });
 
+function getFirstAvailableRunner(): string | undefined {
+  return runners.values().next().value;
+}
+
+createScreenshotWorker(async (job: Job<ScreenshotJobData>) => {
+  const runnerSocketId = getFirstAvailableRunner();
+  
+  if (!runnerSocketId) {
+    throw new Error('No runners available');
+  }
+  
+  setJobState(job.data.id, 'assigned');
+  
+  io.to(runnerSocketId).emit('run_job', job.data);
+  
+  setJobState(job.data.id, 'running');
+});
+
 io.on('connection', (socket) => {
   const { type, runnerId } = socket.handshake.query;
 
@@ -59,15 +82,21 @@ io.on('connection', (socket) => {
       runners.delete(id);
     });
 
-    // --- FORWARDING EVENTS ---
-    
     socket.on('job_update', (data) => {
        console.log(chalk.blue(`[Event] job_update: ${data.status}`));
+       if (data.jobId && data.status) {
+         if (data.status === 'running') {
+           setJobState(data.jobId, 'running');
+         }
+       }
        io.emit('job_update', data);
     });
 
     socket.on('job_complete', (data) => {
        console.log(chalk.green(`[Event] job_complete: ${data.status}`));
+       if (data.jobId) {
+         setJobState(data.jobId, data.status === 'success' ? 'completed' : 'failed');
+       }
        io.emit('job_complete', data);
     });
 
@@ -81,13 +110,36 @@ io.on('connection', (socket) => {
     });
 
   } else {
-    // Client (Frontend)
     console.log(chalk.blue(`[Client] Connected: ${socket.id}`));
     
+    socket.on('trigger_screenshot_job', async (jobPayload) => {
+        console.log(chalk.magenta(`[Client] Triggering screenshot job...`));
+        
+        const jobData: ScreenshotJobData = {
+          id: jobPayload.id || `job-${Date.now()}`,
+          collectionId: jobPayload.collectionId,
+          projectId: jobPayload.projectId,
+          bundleId: jobPayload.bundleId,
+          devices: jobPayload.devices,
+          repoUrl: jobPayload.repoUrl,
+          googleApiKey: jobPayload.googleApiKey,
+          mobilePlatform: jobPayload.mobilePlatform,
+          autoBuild: jobPayload.autoBuild,
+        };
+
+        try {
+          await addScreenshotJob(jobData);
+          socket.emit('job_queued', { jobId: jobData.id });
+        } catch (err) {
+          const error = err as Error;
+          console.error(chalk.red(`[API] Failed to queue job: ${error.message}`));
+          socket.emit('error', { message: 'Failed to queue job' });
+        }
+    });
+
     socket.on('trigger_job', (jobPayload) => {
-        console.log(chalk.magenta(`[Client] Triggering job...`));
-        // Pick a runner (simple round-robin or first available)
-        const runnerSocketId = runners.values().next().value;
+        console.log(chalk.magenta(`[Client] Triggering job (legacy)...`));
+        const runnerSocketId = getFirstAvailableRunner();
         
         if (!runnerSocketId) {
             console.error(chalk.red('[API] No runners available!'));
@@ -95,7 +147,6 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // Dispatch to runner
         io.to(runnerSocketId).emit('run_job', {
             id: `job-${Date.now()}`,
             ...jobPayload
