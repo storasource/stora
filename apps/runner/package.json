@@ -12,6 +12,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@stora-sh/screenshots": "workspace:*",
     "@vercel/blob": "^2.0.0",
     "axios": "^1.6.7",
     "chalk": "^5.3.0",
