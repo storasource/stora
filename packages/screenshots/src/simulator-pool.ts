@@ -5,6 +5,7 @@
  * Provides device lifecycle management, cleanup, and queue-based acquisition.
  */
 
+import { execa } from 'execa';
 import { SimulatorManager } from './index.js';
 import type { PoolDevice, PoolConfig } from './types.js';
 
@@ -117,13 +118,41 @@ export class SimulatorPool {
    * @throws Error if timeout expires while waiting for a device
    */
   async acquire(jobId: string): Promise<string> {
-    // TODO: Implement in Task 2
-    // 1. Check for idle device
-    // 2. If none, create new (if under maxSize)
-    // 3. If at max, add to waitQueue with timeout
-    // 4. Mark device as 'in-use', set inUseBy
-    // 5. Return udid
-    throw new Error('Not implemented: acquire()');
+    // 1. Find idle device
+    const idleDevice = Array.from(this.devices.values()).find(d => d.state === 'idle');
+    
+    if (idleDevice) {
+      idleDevice.state = 'in-use';
+      idleDevice.inUseBy = jobId;
+      idleDevice.lastUsedAt = new Date();
+      return idleDevice.udid;
+    }
+
+    // 2. Create new if under limit
+    if (this.devices.size < this.config.maxSize) {
+      const device = await this.createDevice();
+      device.state = 'in-use';
+      device.inUseBy = jobId;
+      return device.udid;
+    }
+
+    // 3. Queue and wait
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        const index = this.waitQueue.findIndex(w => w.resolve === resolve);
+        if (index !== -1) this.waitQueue.splice(index, 1);
+        reject(new Error('Timeout acquiring device from pool'));
+      }, this.config.acquireTimeout);
+
+      this.waitQueue.push({
+        resolve: (udid: string) => {
+          clearTimeout(timeout);
+          resolve(udid);
+        },
+        reject,
+        acquiredAt: Date.now()
+      });
+    });
   }
 
   /**
@@ -140,12 +169,28 @@ export class SimulatorPool {
    * @returns Promise that resolves when device is cleaned and released
    */
   async release(udid: string, bundleId?: string): Promise<void> {
-    // TODO: Implement in Task 2
-    // 1. Find device in pool
-    // 2. Clean device (uninstall app if bundleId provided)
-    // 3. Mark as 'idle'
-    // 4. Notify first waiter in queue
-    throw new Error('Not implemented: release()');
+    const device = this.devices.get(udid);
+    if (!device) throw new Error(`Device ${udid} not in pool`);
+
+    device.state = 'cleaning';
+    
+    try {
+      await this.cleanDevice(udid, bundleId);
+      device.state = 'idle';
+      device.inUseBy = undefined;
+
+      const waiter = this.waitQueue.shift();
+      if (waiter) {
+        device.state = 'in-use';
+        device.inUseBy = 'queued-job';
+        waiter.resolve(udid);
+      }
+    } catch (error) {
+      device.state = 'corrupted';
+      console.error(`Device ${udid} corrupted, recreating...`);
+      await this.deleteDevice(udid);
+      await this.createDevice();
+    }
   }
 
   /**
@@ -173,12 +218,54 @@ export class SimulatorPool {
    * @private
    */
   private async createDevice(): Promise<PoolDevice> {
-    // TODO: Implement in Task 2
-    // 1. Generate name: `${deviceType}-pool-${Date.now()}`
-    // 2. Call simulatorManager.boot()
-    // 3. Add to devices Map
-    // 4. Return device
-    throw new Error('Not implemented: createDevice()');
+    const deviceName = `${this.config.deviceType.replace(/\s+/g, '-')}-pool-${Date.now()}`;
+    
+    const { stdout: deviceTypesJson } = await execa('xcrun', ['simctl', 'list', 'devicetypes', '-j']);
+    const deviceTypes = JSON.parse(deviceTypesJson).devicetypes as Array<{ name: string; identifier: string }>;
+    const deviceType = deviceTypes.find(dt => dt.name === this.config.deviceType);
+    if (!deviceType) {
+      throw new Error(`Device type "${this.config.deviceType}" not found`);
+    }
+
+    const { stdout: runtimesJson } = await execa('xcrun', ['simctl', 'list', 'runtimes', '-j']);
+    const runtimes = JSON.parse(runtimesJson).runtimes as Array<{ name: string; identifier: string; isAvailable: boolean; version: string }>;
+    const iosRuntimes = runtimes
+      .filter(r => r.name.startsWith('iOS') && r.isAvailable)
+      .sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
+    
+    if (iosRuntimes.length === 0) {
+      throw new Error('No available iOS runtimes found');
+    }
+
+    const runtime = iosRuntimes[0];
+    const { stdout: createOut } = await execa('xcrun', ['simctl', 'create', deviceName, deviceType.identifier, runtime.identifier]);
+    const udid = createOut.trim();
+
+    try {
+      await execa('xcrun', ['simctl', 'boot', udid]);
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      if (!err.message?.includes('Unable to boot device in current state: Booted')) {
+        throw e;
+      }
+    }
+
+    try {
+      await execa('xcrun', ['simctl', 'bootstatus', udid, '-b']);
+    } catch {
+      console.log('bootstatus returned error, but continuing...');
+    }
+
+    const device: PoolDevice = {
+      udid,
+      name: deviceName,
+      deviceType: this.config.deviceType,
+      state: 'idle',
+      createdAt: new Date(),
+    };
+
+    this.devices.set(udid, device);
+    return device;
   }
 
   /**
@@ -189,10 +276,29 @@ export class SimulatorPool {
    * @private
    */
   private async cleanDevice(udid: string, bundleId?: string): Promise<void> {
-    // TODO: Implement in Task 2
-    // If bundleId: xcrun simctl uninstall <udid> <bundleId>
-    // Else if strategy is 'erase': xcrun simctl erase <udid>
-    throw new Error('Not implemented: cleanDevice()');
+    if (bundleId) {
+      await execa('xcrun', ['simctl', 'uninstall', udid, bundleId]);
+    } else if (this.config.cleanupStrategy === 'erase') {
+      await execa('xcrun', ['simctl', 'shutdown', udid]);
+      await execa('xcrun', ['simctl', 'erase', udid]);
+      await execa('xcrun', ['simctl', 'boot', udid]);
+    }
+  }
+
+  /**
+   * Deletes a simulator device and removes it from the pool.
+   *
+   * @param udid - UDID of the device to delete
+   * @private
+   */
+  private async deleteDevice(udid: string): Promise<void> {
+    try {
+      await execa('xcrun', ['simctl', 'shutdown', udid]);
+    } catch {
+      // Ignore shutdown errors (device may already be shutdown)
+    }
+    await execa('xcrun', ['simctl', 'delete', udid]);
+    this.devices.delete(udid);
   }
 
   /**
