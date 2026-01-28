@@ -1,6 +1,7 @@
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs-extra';
+import { randomUUID } from 'crypto';
 import {
   captureScreenshots,
   processRegistry,
@@ -8,6 +9,37 @@ import {
   type MobilePlatform,
 } from '@stora-sh/screenshots';
 import { ArtifactUploader } from './uploader.js';
+
+const PROMPT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+interface PendingPrompt {
+  promptId: string;
+  resolve: (input: string) => void;
+  reject: (error: Error) => void;
+  timeout: NodeJS.Timeout;
+}
+
+// Track pending prompts by jobId:promptId
+const pendingPrompts = new Map<string, PendingPrompt>();
+
+/**
+ * Prompt required event data for Socket.io emission
+ */
+export interface JobPromptRequiredEvent {
+  jobId: string;
+  promptId: string;
+  prompt: string;
+  timestamp: number;
+}
+
+/**
+ * Prompt response event data from Socket.io
+ */
+export interface JobPromptResponseEvent {
+  jobId: string;
+  promptId: string;
+  input: string;
+}
 
 /**
  * Device configuration for screenshot capture
@@ -33,40 +65,44 @@ export interface ScreenshotJob {
   autoBuild?: boolean;
 }
 
-/**
- * Callbacks for streaming progress during screenshot capture
- */
 export interface ScreenshotJobCallbacks {
-  /** Called for progress messages */
   onProgress: (message: string) => void;
-  /** Called when a screenshot is captured and uploaded */
   onScreenshot: (url: string, filename: string) => void;
-  /** Called when an error occurs */
   onError: (message: string) => void;
-  /** Called when the job completes */
   onComplete: (result: ExecutionResult & { uploadedUrls: string[] }) => void;
-  /** Called when CLI prompts for user input */
-  onPromptRequired: (prompt: string, promptId: string) => void;
+  emitPromptRequired: (event: JobPromptRequiredEvent) => void;
 }
 
-/**
- * Submit user input for a pending prompt
- */
 export function submitPromptInput(sessionId: string, input: string): boolean {
   return processRegistry.writeInput(sessionId, input);
 }
 
-/**
- * Handle a screenshot capture job
- *
- * Calls captureScreenshots() with job parameters, streams progress via callbacks,
- * and uploads screenshots to Vercel Blob.
- */
+export function handlePromptResponse(event: JobPromptResponseEvent): boolean {
+  const key = `${event.jobId}:${event.promptId}`;
+  const pending = pendingPrompts.get(key);
+
+  if (!pending) {
+    return false;
+  }
+
+  clearTimeout(pending.timeout);
+  pendingPrompts.delete(key);
+
+  const success = processRegistry.writeInput(event.jobId, event.input);
+  if (success) {
+    pending.resolve(event.input);
+  } else {
+    pending.reject(new Error('Failed to write input to process'));
+  }
+
+  return success;
+}
+
 export async function handleScreenshotJob(
   job: ScreenshotJob,
   callbacks: ScreenshotJobCallbacks
 ): Promise<void> {
-  const { onProgress, onScreenshot, onError, onComplete, onPromptRequired } = callbacks;
+  const { onProgress, onScreenshot, onError, onComplete, emitPromptRequired } = callbacks;
   const uploader = new ArtifactUploader();
   const tempDir = path.join(os.tmpdir(), `screenshot-job-${job.id}`);
   await fs.ensureDir(tempDir);
@@ -80,7 +116,30 @@ export async function handleScreenshotJob(
   onProgress(`Using device: ${simulatorName || 'default'} (${platform})`);
 
   const onPrompt = (prompt: string) => {
-    onPromptRequired(prompt, job.collectionId);
+    const promptId = randomUUID();
+    const key = `${job.collectionId}:${promptId}`;
+
+    const promptPromise = new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        pendingPrompts.delete(key);
+        reject(new Error('PROMPT_TIMEOUT'));
+      }, PROMPT_TIMEOUT_MS);
+
+      pendingPrompts.set(key, { promptId, resolve, reject, timeout });
+    });
+
+    emitPromptRequired({
+      jobId: job.collectionId,
+      promptId,
+      prompt,
+      timestamp: Date.now(),
+    });
+
+    promptPromise.catch((err) => {
+      if (err.message === 'PROMPT_TIMEOUT') {
+        onError(`Prompt timeout: no response received within 5 minutes`);
+      }
+    });
   };
 
   try {

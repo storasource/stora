@@ -1,6 +1,7 @@
 import { SimulatorManager } from './simulator.js';
 import { MaestroRunner } from './maestro.js';
 import { ArtifactUploader } from './uploader.js';
+import { handleScreenshotJob, handlePromptResponse, type ScreenshotJob, type JobPromptResponseEvent } from './screenshot-job.js';
 import { io } from 'socket.io-client';
 import path from 'path';
 import fs from 'fs-extra';
@@ -44,40 +45,56 @@ async function main() {
   });
 
   socket.on('disconnect', () => {
-    console.log(chalk.yellow(`[Socket] Disconnected`));
+      console.log(chalk.yellow(`[Socket] Disconnected`));
+    });
+
+  // Handle prompt responses from orchestrator
+  socket.on('job_prompt_response', (data: JobPromptResponseEvent) => {
+    console.log(chalk.cyan(`[Prompt] Received response for job ${data.jobId}, promptId ${data.promptId}`));
+    const success = handlePromptResponse(data);
+    if (!success) {
+      console.log(chalk.yellow(`[Prompt] No pending prompt found for ${data.jobId}:${data.promptId}`));
+    }
   });
 
-  socket.on('run_job', async (job: any) => {
-    console.log(chalk.magenta(`[Job] Received job: ${job.id}`));
+  socket.on('run_job', async (job: ScreenshotJob) => {
+    console.log(chalk.magenta(`[Job] Received screenshot job: ${job.id}`));
     currentJobId = job.id;
     
     try {
-      // For MVP: We assume the files are already local or we just use the test flow
-      // In prod: await downloadFiles(job.appUrl, job.flowUrl)
-      
-      const appPath = "com.apple.Preferences"; 
-      const flowPath = "test_flow.yaml";      
-      
       socket.emit('job_update', { jobId: job.id, status: 'running' });
       
-      const result = await runLocalJob(appPath, flowPath, job.id);
-      
-      // Ensure we emit completed event EVEN IF video is missing
-      console.log(chalk.magenta(`[Job] Completed successfully, emitting status...`));
-      
-      socket.emit('job_update', { jobId: job.id, status: 'completed' });
-      socket.emit('job_complete', { 
-          jobId: job.id, 
-          status: 'success',
-          videoUrl: result.videoUrl 
+      await handleScreenshotJob(job, {
+        onProgress: (message) => {
+          socket.emit('job_update', { jobId: job.id, status: 'running', message });
+          socket.emit('log', { jobId: job.id, message, type: 'stdout', timestamp: Date.now() });
+        },
+        onScreenshot: (url, filename) => {
+          socket.emit('job_artifact', { 
+            jobId: job.id, 
+            type: 'screenshot', 
+            screenshot: { url, screen: filename, deviceId: job.devices[0]?.id || 'unknown' }
+          });
+        },
+        onError: (message) => {
+          socket.emit('job_error', { jobId: job.id, error: message });
+        },
+        onComplete: (result) => {
+          const status = result.success ? 'success' : 'failed';
+          socket.emit('job_update', { jobId: job.id, status });
+          socket.emit('job_complete', { jobId: job.id, status, ...result });
+        },
+        emitPromptRequired: (event) => {
+          console.log(chalk.yellow(`[Prompt] CLI requires input: ${event.prompt}`));
+          socket.emit('job_prompt_required', event);
+        }
       });
-      
     } catch (e: any) {
       console.error(chalk.red(`[Job] Failed: ${e.message}`));
       socket.emit('job_update', { jobId: job.id, status: 'failed', error: e.message });
       socket.emit('job_complete', { jobId: job.id, status: 'failed', error: e.message });
     } finally {
-        currentJobId = null;
+      currentJobId = null;
     }
   });
 }

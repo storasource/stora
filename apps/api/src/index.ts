@@ -26,6 +26,7 @@ const io = new Server(httpServer, {
 });
 
 const runners = new Map<string, string>();
+const jobToRunner = new Map<string, string>();
 
 const ORCHESTRATOR_TOKEN = process.env.ORCHESTRATOR_TOKEN;
 
@@ -96,6 +97,7 @@ io.on('connection', (socket) => {
        console.log(chalk.green(`[Event] job_complete: ${data.status}`));
        if (data.jobId) {
          setJobState(data.jobId, data.status === 'success' ? 'completed' : 'failed');
+         jobToRunner.delete(data.jobId);
        }
        io.emit('job_complete', data);
     });
@@ -107,6 +109,28 @@ io.on('connection', (socket) => {
     
     socket.on('log', (data) => {
         io.emit('log_stream', data);
+    });
+
+    socket.on('job_prompt_required', (data: { 
+      jobId: string; 
+      promptId: string; 
+      prompt: string; 
+      timestamp: number 
+    }) => {
+      console.log(chalk.yellow(`[Event] job_prompt_required for job ${data.jobId}`));
+      jobToRunner.set(data.jobId, socket.id);
+      io.emit('job_prompt_required', {
+        jobId: data.jobId,
+        promptId: data.promptId,
+        promptType: 'input',
+        message: data.prompt,
+        options: [],
+      });
+    });
+
+    socket.on('job_error', (data) => {
+      console.log(chalk.red(`[Event] job_error: ${data.error}`));
+      io.emit('job_error', data);
     });
 
   } else {
@@ -151,6 +175,20 @@ io.on('connection', (socket) => {
             id: `job-${Date.now()}`,
             ...jobPayload
         });
+    });
+
+    socket.on('job_prompt_response', (data: { jobId: string; promptId?: string; input: string }) => {
+      console.log(chalk.cyan(`[Client] Prompt response for job ${data.jobId}`));
+      const runnerSocketId = jobToRunner.get(data.jobId);
+      if (runnerSocketId) {
+        io.to(runnerSocketId).emit('job_prompt_response', {
+          jobId: data.jobId,
+          promptId: data.promptId || '',
+          input: data.input,
+        });
+      } else {
+        console.error(chalk.red(`[Error] No runner found for job ${data.jobId}`));
+      }
     });
   }
 });
