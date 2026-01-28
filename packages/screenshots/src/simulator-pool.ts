@@ -6,7 +6,6 @@
  */
 
 import { execa } from 'execa';
-import { SimulatorManager } from './index.js';
 import type { PoolDevice, PoolConfig } from './types.js';
 
 /**
@@ -68,12 +67,6 @@ export class SimulatorPool {
   private config: PoolConfig;
 
   /**
-   * Reference to SimulatorManager for device operations
-   * Note: SimulatorManager uses static methods, kept as instance for future refactoring
-   */
-  private simulatorManager: typeof SimulatorManager;
-
-  /**
    * Creates a new SimulatorPool instance.
    *
    * @param config - Partial configuration, merged with defaults
@@ -86,7 +79,6 @@ export class SimulatorPool {
       deviceType: config.deviceType ?? DEFAULT_CONFIG.deviceType,
       cleanupStrategy: config.cleanupStrategy ?? DEFAULT_CONFIG.cleanupStrategy,
     };
-    this.simulatorManager = SimulatorManager;
   }
 
   /**

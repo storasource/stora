@@ -55,70 +55,20 @@ import type { ScreenshotterOptions, AgentAction, ExecutionResult, MobilePlatform
 import { AppInstaller, ExpoGoRunner, type ExpoGoSession } from './app-installer.js';
 import { parseHierarchy, type ParsedHierarchy, toElementList } from './hierarchy-parser.js';
 import { generateSetOfMark } from './set-of-mark.js';
+import { SimulatorPool } from './simulator-pool.js';
 
 export { AppInstaller, ExpoGoRunner, type ExpoGoSession } from './app-installer.js';
 
-export class SimulatorManager {
-  static async bootIosSimulator(deviceName: string): Promise<void> {
-    console.log(`📱 Booting iOS Simulator: ${deviceName}...`);
-    
-    try {
-      const listOutput = execSync('xcrun simctl list devices available -j', {
-        encoding: 'utf-8',
-        stdio: 'pipe',
-      });
-      
-      const devices = JSON.parse(listOutput);
-      let deviceUDID: string | null = null;
-      
-      for (const runtime of Object.values(devices.devices) as Array<Array<{ name: string; udid: string; state: string }>>) {
-        for (const device of runtime) {
-          if (device.name === deviceName || device.name.includes(deviceName)) {
-            deviceUDID = device.udid;
-            if (device.state === 'Booted') {
-              console.log(`✓ Simulator already running: ${device.name}`);
-              return;
-            }
-            break;
-          }
-        }
-        if (deviceUDID) break;
-      }
-      
-      if (!deviceUDID) {
-        throw new Error(`Simulator not found: ${deviceName}. Run 'xcrun simctl list devices available' to see available devices.`);
-      }
-      
-      execSync(`xcrun simctl boot ${deviceUDID}`, {
-        encoding: 'utf-8',
-        stdio: 'pipe',
-      });
-      
-      console.log(`⏳ Waiting for simulator to be ready...`);
-      execSync(`xcrun simctl bootstatus ${deviceUDID} -b`, {
-        encoding: 'utf-8',
-        stdio: 'pipe',
-        timeout: 60000,
-      });
-      
-      execSync('open -a Simulator', { stdio: 'pipe' });
-      
-      console.log(`✓ Simulator ready: ${deviceName}`);
-    } catch (error: unknown) {
-      const err = error as { message?: string; stderr?: string };
-      if (err.message?.includes('current state: Booted') || err.stderr?.includes('current state: Booted')) {
-        console.log(`✓ Simulator already booted`);
-        return;
-      }
-      throw new Error(`Failed to boot simulator: ${err.message || 'Unknown error'}`);
-    }
-  }
-  
-  static async bootAndroidEmulator(deviceName: string): Promise<void> {
-    console.log(`📱 Booting Android Emulator: ${deviceName}...`);
-    throw new Error('Android emulator boot not yet implemented');
-  }
-}
+// Create singleton pool instance
+const pool = new SimulatorPool({
+  maxSize: 5,
+  preCreateCount: 2,
+  deviceType: 'iPhone 15 Pro',
+  cleanupStrategy: 'uninstall'
+});
+
+// Initialize pool on first import
+pool.initialize().catch(console.error);
 
 /**
  * Maestro wrapper for UI automation
@@ -589,147 +539,146 @@ function sleep(ms: number): Promise<void> {
 export async function captureScreenshots(options: ScreenshotterOptions): Promise<ExecutionResult> {
   const startTime = Date.now();
   const errors: string[] = [];
+  const jobId = `job-${Date.now()}`;
+  let deviceUdid: string | undefined;
 
-  const config = {
-    bundleId: options.bundleId,
-    maxScreenshots: options.maxScreenshots ?? 10,
-    maxSteps: options.maxSteps ?? 50,
-    outputDir: options.outputDir ?? './store-screenshots',
-    saveEvalScreens: options.saveEvalScreens ?? false,
-    evalScreensDir: options.evalScreensDir ?? './eval-screens',
-    googleApiKey:
-      options.googleApiKey ||
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-      process.env.GOOGLE_API_KEY,
-    model: options.model ?? 'gemini-3-flash-preview',
-    device: options.device,
-    platform: options.platform ?? 'ios',
-    repoUrl: options.repoUrl,
-    mobilePlatform: options.mobilePlatform,
-    autoBuild: options.autoBuild ?? (options.repoUrl ? true : false),
-    sessionId: options.sessionId,
-    onPrompt: options.onPrompt,
-  };
-
-  if (!config.googleApiKey) {
-    throw new Error(
-      'Google API key required. Set GOOGLE_GENERATIVE_AI_API_KEY or pass googleApiKey option.'
-    );
-  }
-
-  let clonedRepoPath: string | undefined;
-  let expoGoSession: ExpoGoSession | undefined;
-
-  if (config.device) {
-    if (config.platform === 'ios') {
-      await SimulatorManager.bootIosSimulator(config.device);
-    } else {
-      await SimulatorManager.bootAndroidEmulator(config.device);
-    }
-    await sleep(2000);
-  }
-
-  if (config.repoUrl && config.autoBuild) {
-    try {
-      clonedRepoPath = await AppInstaller.cloneRepo(config.repoUrl);
-      
-      const detectedPlatform = config.mobilePlatform || AppInstaller.detectPlatform(clonedRepoPath);
-      console.log(`🔍 Detected platform: ${detectedPlatform}`);
-      
-      if (detectedPlatform === 'expo') {
-        console.log('📱 Using Expo Go approach (no native build required)...');
-        expoGoSession = await ExpoGoRunner.start(clonedRepoPath, {
-          sessionId: config.sessionId,
-          onPrompt: config.onPrompt,
-        });
-        config.bundleId = expoGoSession.bundleId;
-        console.log('✓ Expo Go session started');
-      } else {
-        const installer = new AppInstaller(clonedRepoPath, detectedPlatform, {
-          sessionId: config.sessionId,
-          onPrompt: config.onPrompt,
-        });
-        const appPath = await installer.buildAndInstall();
-        
-        await AppInstaller.installApp(appPath);
-        console.log('✓ App build and install complete');
-      }
-    } catch (error: unknown) {
-      const err = error as { message?: string };
-      const errorMessage = err.message || 'Unknown error';
-      
-      if (expoGoSession) {
-        expoGoSession.cleanup();
-      } else if (errorMessage.includes('.app bundle') || errorMessage.includes('Build products not found')) {
-        console.log('');
-        console.log('⚠️  Build directory preserved for debugging at:');
-        console.log(`   ${clonedRepoPath}`);
-        console.log('');
-        console.log('To investigate manually:');
-        console.log(`   cd "${clonedRepoPath}"`);
-        console.log(`   find . -name "*.app" -type d`);
-        console.log('');
-      } else if (clonedRepoPath) {
-        AppInstaller.cleanup(clonedRepoPath);
-      }
-      throw new Error(`Build failed: ${errorMessage}`);
-    }
-  }
-
-  const maestro = new MaestroClient(config.bundleId);
-  const agent = new VisionAgent(config.googleApiKey, config.model, config.maxScreenshots);
-  const screenshots = new ScreenshotManager(config.outputDir);
-
-  const screenHistory: string[] = [];
-  const lastActions: string[] = [];
-  const recentErrors: string[] = [];
-  let lastScreenHash = '';
-  let sameScreenCount = 0;
-  let consecutiveTapTextFailures = 0;
-  let steps = 0;
-
-  // Launch app
-  console.log('📱 Launching app...');
   try {
-    await maestro.launch();
-    console.log('✓ App launched');
-  } catch (error: unknown) {
-    const err = error as { message?: string };
-    throw new Error(`Failed to launch app: ${err.message || 'Unknown error'}`);
-  }
-
-  await sleep(3000);
-
-  // Main exploration loop
-  while (steps < config.maxSteps && screenshots.count() < config.maxScreenshots) {
-    steps++;
-    console.log(`\n━━━ Step ${steps}/${config.maxSteps} ━━━`);
-
-    let enhancedContext: {
-      screenshot: string;
-      annotatedScreenshot: string;
-      hierarchy: unknown;
-      parsedHierarchy: ParsedHierarchy;
+    const config = {
+      bundleId: options.bundleId,
+      maxScreenshots: options.maxScreenshots ?? 10,
+      maxSteps: options.maxSteps ?? 50,
+      outputDir: options.outputDir ?? './store-screenshots',
+      saveEvalScreens: options.saveEvalScreens ?? false,
+      evalScreensDir: options.evalScreensDir ?? './eval-screens',
+      googleApiKey:
+        options.googleApiKey ||
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+        process.env.GOOGLE_API_KEY,
+      model: options.model ?? 'gemini-3-flash-preview',
+      device: options.device,
+      platform: options.platform ?? 'ios',
+      repoUrl: options.repoUrl,
+      mobilePlatform: options.mobilePlatform,
+      autoBuild: options.autoBuild ?? (options.repoUrl ? true : false),
+      sessionId: options.sessionId,
+      onPrompt: options.onPrompt,
     };
 
-    console.log('👁️  Observing screen...');
-    try {
-      enhancedContext = await maestro.getEnhancedContext();
-      
-      if (config.saveEvalScreens) {
-        mkdirSync(config.evalScreensDir, { recursive: true });
-        const evalPath = path.join(
-          config.evalScreensDir,
-          `step-${String(steps).padStart(3, '0')}-annotated.png`
-        );
-        writeFileSync(evalPath, Buffer.from(enhancedContext.annotatedScreenshot, 'base64'));
+    if (!config.googleApiKey) {
+      throw new Error(
+        'Google API key required. Set GOOGLE_GENERATIVE_AI_API_KEY or pass googleApiKey option.'
+      );
+    }
+
+    let clonedRepoPath: string | undefined;
+    let expoGoSession: ExpoGoSession | undefined;
+
+    if (config.device) {
+      deviceUdid = await pool.acquire(jobId);
+      await sleep(2000);
+    }
+
+    if (config.repoUrl && config.autoBuild) {
+      try {
+        clonedRepoPath = await AppInstaller.cloneRepo(config.repoUrl);
+        
+        const detectedPlatform = config.mobilePlatform || AppInstaller.detectPlatform(clonedRepoPath);
+        console.log(`🔍 Detected platform: ${detectedPlatform}`);
+        
+        if (detectedPlatform === 'expo') {
+          console.log('📱 Using Expo Go approach (no native build required)...');
+          expoGoSession = await ExpoGoRunner.start(clonedRepoPath, {
+            sessionId: config.sessionId,
+            onPrompt: config.onPrompt,
+          });
+          config.bundleId = expoGoSession.bundleId;
+          console.log('✓ Expo Go session started');
+        } else {
+          const installer = new AppInstaller(clonedRepoPath, detectedPlatform, {
+            sessionId: config.sessionId,
+            onPrompt: config.onPrompt,
+          });
+          const appPath = await installer.buildAndInstall();
+          
+          await AppInstaller.installApp(appPath);
+          console.log('✓ App build and install complete');
+        }
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        const errorMessage = err.message || 'Unknown error';
+        
+        if (expoGoSession) {
+          expoGoSession.cleanup();
+        } else if (errorMessage.includes('.app bundle') || errorMessage.includes('Build products not found')) {
+          console.log('');
+          console.log('⚠️  Build directory preserved for debugging at:');
+          console.log(`   ${clonedRepoPath}`);
+          console.log('');
+          console.log('To investigate manually:');
+          console.log(`   cd "${clonedRepoPath}"`);
+          console.log(`   find . -name "*.app" -type d`);
+          console.log('');
+        } else if (clonedRepoPath) {
+          AppInstaller.cleanup(clonedRepoPath);
+        }
+        throw new Error(`Build failed: ${errorMessage}`);
       }
+    }
+
+    const maestro = new MaestroClient(config.bundleId);
+    const agent = new VisionAgent(config.googleApiKey, config.model, config.maxScreenshots);
+    const screenshots = new ScreenshotManager(config.outputDir);
+
+    const screenHistory: string[] = [];
+    const lastActions: string[] = [];
+    const recentErrors: string[] = [];
+    let lastScreenHash = '';
+    let sameScreenCount = 0;
+    let consecutiveTapTextFailures = 0;
+    let steps = 0;
+
+    // Launch app
+    console.log('📱 Launching app...');
+    try {
+      await maestro.launch();
+      console.log('✓ App launched');
     } catch (error: unknown) {
       const err = error as { message?: string };
-      console.error('❌ Observation failed:', err.message || 'Unknown error');
-      errors.push(`Observation failed: ${err.message || 'Unknown error'}`);
-      await sleep(2000);
-      continue;
+      throw new Error(`Failed to launch app: ${err.message || 'Unknown error'}`);
+    }
+
+    await sleep(3000);
+
+    // Main exploration loop
+    while (steps < config.maxSteps && screenshots.count() < config.maxScreenshots) {
+      steps++;
+      console.log(`\n━━━ Step ${steps}/${config.maxSteps} ━━━`);
+
+      let enhancedContext: {
+        screenshot: string;
+        annotatedScreenshot: string;
+        hierarchy: unknown;
+        parsedHierarchy: ParsedHierarchy;
+      };
+
+      console.log('👁️  Observing screen...');
+      try {
+        enhancedContext = await maestro.getEnhancedContext();
+      
+        if (config.saveEvalScreens) {
+          mkdirSync(config.evalScreensDir, { recursive: true });
+          const evalPath = path.join(
+            config.evalScreensDir,
+            `step-${String(steps).padStart(3, '0')}-annotated.png`
+          );
+          writeFileSync(evalPath, Buffer.from(enhancedContext.annotatedScreenshot, 'base64'));
+        }
+      } catch (error: unknown) {
+        const err = error as { message?: string };
+        console.error('❌ Observation failed:', err.message || 'Unknown error');
+        errors.push(`Observation failed: ${err.message || 'Unknown error'}`);
+        await sleep(2000);
+        continue;
     }
 
     const screenHash = createHash('md5')
@@ -880,20 +829,29 @@ export async function captureScreenshots(options: ScreenshotterOptions): Promise
     }
   }
 
-  console.log(`\n✨ Complete! ${screenshots.count()} screenshots saved to ${config.outputDir}`);
+    console.log(`\n✨ Complete! ${screenshots.count()} screenshots saved to ${config.outputDir}`);
 
-  if (expoGoSession) {
-    expoGoSession.cleanup();
-  } else if (clonedRepoPath) {
-    AppInstaller.cleanup(clonedRepoPath);
+    if (expoGoSession) {
+      expoGoSession.cleanup();
+    } else if (clonedRepoPath) {
+      AppInstaller.cleanup(clonedRepoPath);
+    }
+
+    return {
+      success: screenshots.count() > 0,
+      screenshotCount: screenshots.count(),
+      totalSteps: steps,
+      screenshots: screenshots.getAll(),
+      duration: Date.now() - startTime,
+      errors,
+    };
+  } finally {
+    if (deviceUdid) {
+      await pool.release(deviceUdid, options.bundleId);
+    }
   }
+}
 
-  return {
-    success: screenshots.count() > 0,
-    screenshotCount: screenshots.count(),
-    totalSteps: steps,
-    screenshots: screenshots.getAll(),
-    duration: Date.now() - startTime,
-    errors,
-  };
+export async function shutdownPool(): Promise<void> {
+  await pool.shutdown();
 }
