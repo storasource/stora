@@ -115,9 +115,9 @@ export async function handleScreenshotJob(
 
   onProgress(`Using device: ${simulatorName || 'default'} (${platform})`);
 
-  const onPrompt = (prompt: string) => {
-    const promptId = randomUUID();
-    const key = `${job.collectionId}:${promptId}`;
+   const onPrompt = (prompt: string) => {
+     const promptId = randomUUID();
+     const key = `${job.id}:${promptId}`;
 
     const promptPromise = new Promise<string>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -128,12 +128,12 @@ export async function handleScreenshotJob(
       pendingPrompts.set(key, { promptId, resolve, reject, timeout });
     });
 
-    emitPromptRequired({
-      jobId: job.collectionId,
-      promptId,
-      prompt,
-      timestamp: Date.now(),
-    });
+     emitPromptRequired({
+       jobId: job.id,
+       promptId,
+       prompt,
+       timestamp: Date.now(),
+     });
 
     promptPromise.catch((err) => {
       if (err.message === 'PROMPT_TIMEOUT') {
