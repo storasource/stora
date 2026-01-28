@@ -2,6 +2,7 @@ import { SimulatorManager } from './simulator.js';
 import { MaestroRunner } from './maestro.js';
 import { ArtifactUploader } from './uploader.js';
 import { handleScreenshotJob, handlePromptResponse, type ScreenshotJob, type JobPromptResponseEvent } from './screenshot-job.js';
+import { shutdownPool } from '@stora-sh/screenshots';
 import { io } from 'socket.io-client';
 import path from 'path';
 import fs from 'fs-extra';
@@ -194,3 +195,15 @@ async function getFiles(dir: string): Promise<string[]> {
 }
 
 main().catch(err => console.error(err));
+
+process.on('SIGTERM', async () => {
+  console.log('Shutting down gracefully...');
+  await shutdownPool();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('Shutting down gracefully...');
+  await shutdownPool();
+  process.exit(0);
+});
