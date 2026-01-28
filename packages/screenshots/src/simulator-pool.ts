@@ -96,12 +96,11 @@ export class SimulatorPool {
    * @returns Promise that resolves when all pre-created devices are ready
    */
   async initialize(): Promise<void> {
-    // TODO: Implement in Task 2
-    // Pre-create devices based on preCreateCount
-    // for (let i = 0; i < this.config.preCreateCount; i++) {
-    //   await this.createDevice();
-    // }
-    throw new Error('Not implemented: initialize()');
+    await this.cleanupOrphanedDevices();
+    
+    for (let i = 0; i < this.config.preCreateCount; i++) {
+      await this.createDevice();
+    }
   }
 
   /**
@@ -122,6 +121,17 @@ export class SimulatorPool {
     const idleDevice = Array.from(this.devices.values()).find(d => d.state === 'idle');
     
     if (idleDevice) {
+      // Health check: verify device is bootable before returning
+      try {
+        await execa('xcrun', ['simctl', 'bootstatus', idleDevice.udid, '-b'], { timeout: 10000 });
+      } catch {
+        // Device failed health check - mark corrupted and recreate
+        console.error(`Device ${idleDevice.udid} failed health check, recreating...`);
+        idleDevice.state = 'corrupted';
+        await this.deleteDevice(idleDevice.udid);
+        return this.acquire(jobId);
+      }
+      
       idleDevice.state = 'in-use';
       idleDevice.inUseBy = jobId;
       idleDevice.lastUsedAt = new Date();
@@ -313,11 +323,18 @@ export class SimulatorPool {
    * @returns Promise that resolves when cleanup is complete
    */
   async cleanupOrphanedDevices(): Promise<void> {
-    // TODO: Implement in Task 3
-    // 1. Get all devices: xcrun simctl list devices -j
-    // 2. Find devices with "pool-" prefix not in this.devices
-    // 3. Delete orphaned devices
-    throw new Error('Not implemented: cleanupOrphanedDevices()');
+    const { stdout } = await execa('xcrun', ['simctl', 'list', 'devices', '-j']);
+    const allDevices = Object.values(JSON.parse(stdout).devices).flat() as Array<{ name: string; udid: string; state: string }>;
+    
+    const orphanedDevices = allDevices.filter(d => 
+      d.name.includes('pool-') && !this.devices.has(d.udid)
+    );
+
+    for (const device of orphanedDevices) {
+      console.log(`Cleaning up orphaned device: ${device.name}`);
+      await execa('xcrun', ['simctl', 'shutdown', device.udid]).catch(() => {});
+      await execa('xcrun', ['simctl', 'delete', device.udid]);
+    }
   }
 
   /**
