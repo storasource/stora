@@ -97,3 +97,21 @@ export interface ExecutionResult {
   /** Any errors encountered */
   errors: string[];
 }
+
+export interface PoolDevice {
+  udid: string;
+  name: string;
+  deviceType: string;
+  state: 'idle' | 'in-use' | 'cleaning' | 'corrupted';
+  inUseBy?: string;
+  createdAt: Date;
+  lastUsedAt?: Date;
+}
+
+export interface PoolConfig {
+  maxSize: number;
+  preCreateCount: number;
+  acquireTimeout: number;
+  deviceType: string;
+  cleanupStrategy: 'uninstall' | 'erase';
+}
