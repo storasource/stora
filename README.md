@@ -100,7 +100,28 @@ Use the CLI for the full experience, or install individual packages for programm
 ```bash
 # Required for AI features
 export GOOGLE_GENERATIVE_AI_API_KEY=your-api-key
+
+# Optional: Vercel Blob Storage (required for cloud deployment)
+# If not set, screenshots will be saved locally to stora-platform/public/videos/
+export BLOB_READ_WRITE_TOKEN=vercel_blob_rw_XXXXXXXXXX
 ```
+
+## Cloud Deployment: Screenshot Upload Configuration
+
+### Vercel Blob Storage
+
+For production deployments, screenshots are uploaded to Vercel Blob for persistent storage.
+
+**Setup:**
+1. Create a Blob store at [https://vercel.com/dashboard/stores](https://vercel.com/dashboard/stores)
+2. Copy the Read/Write token
+3. Set the environment variable on your runner (e.g., Scaleway):
+   ```bash
+   export BLOB_READ_WRITE_TOKEN=vercel_blob_rw_XXXXXXXXXX
+   ```
+
+**Development Fallback:**
+If `BLOB_READ_WRITE_TOKEN` is not set, screenshots will be saved locally to `stora-platform/public/videos/`. This is suitable for local development but not for cloud deployments.
 
 ## Development
 
