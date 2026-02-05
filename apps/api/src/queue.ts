@@ -12,6 +12,7 @@ export interface ScreenshotJobData {
   googleApiKey: string;
   mobilePlatform?: string;
   autoBuild?: boolean;
+  useV2Flow?: boolean;
 }
 
 export type JobState = 'queued' | 'assigned' | 'running' | 'completed' | 'failed';

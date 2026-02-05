@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -16,13 +17,54 @@ const PORT = process.env.PORT || 3001;
 
 const app = express();
 app.use(cors());
+app.use(express.json());
+
+app.post('/jobs', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token !== ORCHESTRATOR_TOKEN) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const jobPayload = req.body;
+  console.log(chalk.magenta(`[HTTP] Triggering screenshot job...`));
+  console.log(chalk.magenta(`[HTTP] Received payload:`, JSON.stringify(jobPayload, null, 2)));
+
+  const jobData: ScreenshotJobData = {
+    id: jobPayload.id || `job-${Date.now()}`,
+    collectionId: jobPayload.collectionId,
+    projectId: jobPayload.projectId,
+    bundleId: jobPayload.bundleId,
+    devices: jobPayload.devices,
+    repoUrl: jobPayload.repoUrl,
+    googleApiKey: jobPayload.googleApiKey,
+    mobilePlatform: jobPayload.mobilePlatform,
+    autoBuild: jobPayload.autoBuild,
+  };
+
+  try {
+    await addScreenshotJob(jobData);
+    // Broadcast queued event so clients (via socket) know about it
+    io.emit('job_queued', { jobId: jobData.id });
+    res.json({ jobId: jobData.id });
+  } catch (err) {
+    const error = err as Error;
+    console.error(chalk.red(`[API] Failed to queue job: ${error.message}`));
+    res.status(500).json({ error: 'Failed to queue job' });
+  }
+});
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
-  }
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  connectTimeout: 60000,
+  transports: ['websocket', 'polling'],
 });
 
 const runners = new Map<string, string>();
@@ -136,8 +178,15 @@ io.on('connection', (socket) => {
   } else {
     console.log(chalk.blue(`[Client] Connected: ${socket.id}`));
     
+    // Debug: Log ALL incoming events
+    socket.onAny((eventName, ...args) => {
+      console.log(chalk.yellow(`[Debug] Received event '${eventName}' from ${socket.id}`));
+    });
+    
+    console.log(chalk.blue(`[Client] Registering trigger_screenshot_job listener for ${socket.id}`));
     socket.on('trigger_screenshot_job', async (jobPayload) => {
         console.log(chalk.magenta(`[Client] Triggering screenshot job...`));
+        console.log(chalk.magenta(`[Client] Received payload:`, JSON.stringify(jobPayload, null, 2)));
         
         const jobData: ScreenshotJobData = {
           id: jobPayload.id || `job-${Date.now()}`,
@@ -149,6 +198,7 @@ io.on('connection', (socket) => {
           googleApiKey: jobPayload.googleApiKey,
           mobilePlatform: jobPayload.mobilePlatform,
           autoBuild: jobPayload.autoBuild,
+          useV2Flow: jobPayload.useV2Flow,
         };
 
         try {
@@ -190,6 +240,10 @@ io.on('connection', (socket) => {
         console.error(chalk.red(`[Error] No runner found for job ${data.jobId}`));
       }
     });
+
+    // Signal to client that all listeners are ready
+    socket.emit('server_ready');
+    console.log(chalk.green(`[Client] Server ready signal sent to ${socket.id}`));
   }
 });
 
