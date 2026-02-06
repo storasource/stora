@@ -41,6 +41,10 @@ export function getJobState(jobId: string): JobState | undefined {
 export async function addScreenshotJob(data: ScreenshotJobData): Promise<Job<ScreenshotJobData>> {
   const job = await screenshotQueue.add('screenshot', data, {
     jobId: data.id,
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 10000 },
+    removeOnComplete: 100,
+    removeOnFail: 50,
   });
   setJobState(data.id, 'queued');
   console.log(chalk.magenta(`[Queue] Job added: ${data.id}`));
@@ -52,6 +56,7 @@ export function createScreenshotWorker(
 ): Worker<ScreenshotJobData> {
   const worker = new Worker<ScreenshotJobData>('screenshot-jobs', processor, {
     connection: redis,
+    concurrency: 5,
   });
 
   worker.on('completed', (job) => {

@@ -9,6 +9,7 @@ import {
   addScreenshotJob, 
   createScreenshotWorker, 
   setJobState, 
+  screenshotQueue,
   ScreenshotJobData,
   Job
 } from './queue.js';
@@ -61,6 +62,30 @@ app.post('/jobs', async (req, res) => {
   }
 });
 
+app.get('/health', async (_req, res) => {
+  const connectedRunners = runners.size;
+  let busyRunners = 0;
+  for (const [runnerId] of runners) {
+    if ((runnerActiveJobs.get(runnerId) || 0) > 0) busyRunners++;
+  }
+
+  let queueCounts: { waiting: number; active: number; completed: number; failed: number } = { waiting: 0, active: 0, completed: 0, failed: 0 };
+  try {
+    const counts = await screenshotQueue.getJobCounts('waiting', 'active', 'completed', 'failed');
+    queueCounts = { waiting: counts.waiting || 0, active: counts.active || 0, completed: counts.completed || 0, failed: counts.failed || 0 };
+  } catch {}
+
+  res.json({
+    status: 'ok',
+    runners: {
+      connected: connectedRunners,
+      busy: busyRunners,
+      available: connectedRunners - busyRunners,
+    },
+    queue: queueCounts,
+  });
+});
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
@@ -75,6 +100,8 @@ const io = new Server(httpServer, {
 
 const runners = new Map<string, string>();
 const jobToRunner = new Map<string, string>();
+const runnerActiveJobs = new Map<string, number>();
+const MAX_JOBS_PER_RUNNER = 2;
 
 const ORCHESTRATOR_TOKEN = process.env.ORCHESTRATOR_TOKEN;
 
@@ -100,12 +127,23 @@ io.use((socket, next) => {
   next();
 });
 
-function getFirstAvailableRunner(): string | undefined {
-  return runners.values().next().value;
+function getLeastLoadedRunner(): string | undefined {
+  let bestRunner: string | undefined;
+  let minJobs = Infinity;
+
+  for (const [runnerId, socketId] of runners) {
+    const activeJobs = runnerActiveJobs.get(runnerId) || 0;
+    if (activeJobs < MAX_JOBS_PER_RUNNER && activeJobs < minJobs) {
+      minJobs = activeJobs;
+      bestRunner = socketId;
+    }
+  }
+
+  return bestRunner;
 }
 
 const worker = createScreenshotWorker(async (job: Job<ScreenshotJobData>) => {
-  const runnerSocketId = getFirstAvailableRunner();
+  const runnerSocketId = getLeastLoadedRunner();
   
   if (!runnerSocketId) {
     throw new Error('No runners available');
@@ -119,6 +157,14 @@ const worker = createScreenshotWorker(async (job: Job<ScreenshotJobData>) => {
     message: 'Found available runner, dispatching job...' 
   });
   
+  // Track which runner gets this job for load balancing
+  const assignedRunnerId = [...runners.entries()].find(([, sid]) => sid === runnerSocketId)?.[0];
+  if (assignedRunnerId) {
+    runnerActiveJobs.set(assignedRunnerId, (runnerActiveJobs.get(assignedRunnerId) || 0) + 1);
+    jobToRunner.set(job.data.id, runnerSocketId);
+    console.log(chalk.blue(`[Router] Assigned job ${job.data.id} to runner ${assignedRunnerId} (active: ${runnerActiveJobs.get(assignedRunnerId)})`));
+  }
+
   try {
     await io.to(runnerSocketId).timeout(10000).emitWithAck('run_job', job.data);
     setJobState(job.data.id, 'running');
@@ -166,6 +212,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
       console.log(chalk.yellow(`[Runner] Disconnected: ${id}`));
       runners.delete(id);
+      runnerActiveJobs.delete(id);
     });
 
     socket.on('job_update', (data) => {
@@ -183,6 +230,9 @@ io.on('connection', (socket) => {
        if (data.jobId) {
          setJobState(data.jobId, data.status === 'success' ? 'completed' : 'failed');
          jobToRunner.delete(data.jobId);
+         const activeJobs = runnerActiveJobs.get(id) || 0;
+         runnerActiveJobs.set(id, Math.max(0, activeJobs - 1));
+         console.log(chalk.blue(`[Router] Runner ${id} job done (active: ${runnerActiveJobs.get(id)})`));
        }
        io.emit('job_complete', data);
     });
@@ -256,7 +306,7 @@ io.on('connection', (socket) => {
 
     socket.on('trigger_job', (jobPayload) => {
         console.log(chalk.magenta(`[Client] Triggering job (legacy)...`));
-        const runnerSocketId = getFirstAvailableRunner();
+        const runnerSocketId = getLeastLoadedRunner();
         
         if (!runnerSocketId) {
             console.error(chalk.red('[API] No runners available!'));
