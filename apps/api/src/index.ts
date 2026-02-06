@@ -27,21 +27,27 @@ app.post('/jobs', async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  if (runners.size === 0) {
+    console.warn(chalk.yellow('[API] Job rejected: No runners connected'));
+    return res.status(503).json({ error: 'No runners available' });
+  }
+
   const jobPayload = req.body;
   console.log(chalk.magenta(`[HTTP] Triggering screenshot job...`));
   console.log(chalk.magenta(`[HTTP] Received payload:`, JSON.stringify(jobPayload, null, 2)));
 
-  const jobData: ScreenshotJobData = {
-    id: jobPayload.id || `job-${Date.now()}`,
-    collectionId: jobPayload.collectionId,
-    projectId: jobPayload.projectId,
-    bundleId: jobPayload.bundleId,
-    devices: jobPayload.devices,
-    repoUrl: jobPayload.repoUrl,
-    googleApiKey: jobPayload.googleApiKey,
-    mobilePlatform: jobPayload.mobilePlatform,
-    autoBuild: jobPayload.autoBuild,
-  };
+   const jobData: ScreenshotJobData = {
+     id: jobPayload.id || `job-${Date.now()}`,
+     collectionId: jobPayload.collectionId,
+     projectId: jobPayload.projectId,
+     bundleId: jobPayload.bundleId,
+     devices: jobPayload.devices,
+     repoUrl: jobPayload.repoUrl,
+     googleApiKey: jobPayload.googleApiKey,
+     mobilePlatform: jobPayload.mobilePlatform,
+     autoBuild: jobPayload.autoBuild,
+     useV2Flow: jobPayload.useV2Flow ?? true,
+   };
 
   try {
     await addScreenshotJob(jobData);
@@ -98,7 +104,7 @@ function getFirstAvailableRunner(): string | undefined {
   return runners.values().next().value;
 }
 
-createScreenshotWorker(async (job: Job<ScreenshotJobData>) => {
+const worker = createScreenshotWorker(async (job: Job<ScreenshotJobData>) => {
   const runnerSocketId = getFirstAvailableRunner();
   
   if (!runnerSocketId) {
@@ -107,9 +113,46 @@ createScreenshotWorker(async (job: Job<ScreenshotJobData>) => {
   
   setJobState(job.data.id, 'assigned');
   
-  io.to(runnerSocketId).emit('run_job', job.data);
+  io.emit('job_update', { 
+    jobId: job.data.id, 
+    status: 'assigned',
+    message: 'Found available runner, dispatching job...' 
+  });
   
-  setJobState(job.data.id, 'running');
+  try {
+    await io.to(runnerSocketId).timeout(10000).emitWithAck('run_job', job.data);
+    setJobState(job.data.id, 'running');
+  } catch (e) {
+    const err = e as Error;
+    console.error(chalk.red(`[Worker] Runner failed to acknowledge job: ${err.message}`));
+    
+    io.emit('job_error', { 
+      jobId: job.data.id, 
+      error: 'Runner failed to accept job (timeout). Please try again or restart the runner.' 
+    });
+    
+    throw new Error('Runner acknowledgement timeout');
+  }
+});
+
+worker.on('failed', (job, err) => {
+  if (job) {
+    io.emit('job_error', { 
+      jobId: job.data.id, 
+      error: err.message || 'Job failed' 
+    });
+    io.emit('job_complete', {
+      jobId: job.data.id,
+      status: 'failed',
+      error: err.message
+    });
+  }
+});
+
+worker.on('completed', (job) => {
+  // We rely on the runner to send the explicit 'job_complete' event with artifacts,
+  // but we can send a backup status update here if needed.
+  // For now, let's just log.
 });
 
 io.on('connection', (socket) => {
