@@ -10,6 +10,11 @@ export interface ScreenshotJobData {
   devices: string[];
   repoUrl: string;
   googleApiKey: string;
+  openaiApiKey?: string;
+  model?: string;
+  fallbackModel?: string;
+  lowConfidenceThreshold?: number;
+  failureEscalationThreshold?: number;
   mobilePlatform?: string;
   autoBuild?: boolean;
   useV2Flow?: boolean;
