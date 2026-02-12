@@ -25,6 +25,13 @@ const sim = new SimulatorManager();
 const maestro = new MaestroRunner();
 const uploader = new ArtifactUploader();
 
+interface RunJobAck {
+  accepted: boolean;
+  runnerId: string;
+  jobId?: string;
+  error?: string;
+}
+
 // Global job context to stream logs
 let currentJobId: string | null = null;
 
@@ -58,9 +65,22 @@ async function main() {
     }
   });
 
-  socket.on('run_job', async (job: ScreenshotJob) => {
+  socket.on('run_job', async (job: ScreenshotJob, ack?: (response: RunJobAck) => void) => {
     console.log(chalk.magenta(`[Job] Received screenshot job: ${job.id}`));
     currentJobId = job.id;
+
+    // The orchestrator dispatch path uses emitWithAck() and expects an explicit ack.
+    if (typeof ack === 'function') {
+      try {
+        ack({
+          accepted: true,
+          runnerId: RUNNER_ID,
+          jobId: job.id,
+        });
+      } catch (ackError) {
+        console.warn(chalk.yellow(`[Job] Failed to send run_job ack: ${String(ackError)}`));
+      }
+    }
     
     try {
       socket.emit('job_update', { jobId: job.id, status: 'running' });

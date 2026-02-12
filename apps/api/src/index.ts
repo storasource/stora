@@ -45,9 +45,14 @@ app.post('/jobs', async (req, res) => {
      devices: jobPayload.devices,
      repoUrl: jobPayload.repoUrl,
      googleApiKey: jobPayload.googleApiKey,
+     openaiApiKey: jobPayload.openaiApiKey,
+     model: jobPayload.model,
+     fallbackModel: jobPayload.fallbackModel,
+     lowConfidenceThreshold: jobPayload.lowConfidenceThreshold,
+     failureEscalationThreshold: jobPayload.failureEscalationThreshold,
      mobilePlatform: jobPayload.mobilePlatform,
      autoBuild: jobPayload.autoBuild,
-     useV2Flow: jobPayload.useV2Flow ?? true,
+     useV2Flow: resolveUseV2Flow(jobPayload),
    };
 
   try {
@@ -104,6 +109,18 @@ const runnerActiveJobs = new Map<string, number>();
 const MAX_JOBS_PER_RUNNER = 2;
 
 const ORCHESTRATOR_TOKEN = process.env.ORCHESTRATOR_TOKEN;
+
+function resolveUseV2Flow(jobPayload: {
+  mobilePlatform?: string;
+  useV2Flow?: boolean;
+}): boolean {
+  if (typeof jobPayload.useV2Flow === 'boolean') {
+    return jobPayload.useV2Flow;
+  }
+
+  const normalizedPlatform = (jobPayload.mobilePlatform || '').toLowerCase();
+  return normalizedPlatform !== 'swift';
+}
 
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
@@ -171,12 +188,20 @@ const worker = createScreenshotWorker(async (job: Job<ScreenshotJobData>) => {
   } catch (e) {
     const err = e as Error;
     console.error(chalk.red(`[Worker] Runner failed to acknowledge job: ${err.message}`));
-    
+
+    const isAckTimeout =
+      err.message.includes('operation has timed out') ||
+      err.message.includes('timeout') ||
+      err.message.includes('acknowledg');
+    const diagnosticMessage = isAckTimeout
+      ? 'Runner failed to accept job (timeout). Likely missing run_job acknowledgment callback on runner. Verify runner/orchestrator versions and ORCHESTRATOR_TOKEN.'
+      : 'Runner failed to accept job. Check runner logs and orchestrator connectivity.';
+
     io.emit('job_error', { 
       jobId: job.data.id, 
-      error: 'Runner failed to accept job (timeout). Please try again or restart the runner.' 
+      error: diagnosticMessage,
     });
-    
+
     throw new Error('Runner acknowledgement timeout');
   }
 });
@@ -289,9 +314,14 @@ io.on('connection', (socket) => {
           devices: jobPayload.devices,
           repoUrl: jobPayload.repoUrl,
           googleApiKey: jobPayload.googleApiKey,
+          openaiApiKey: jobPayload.openaiApiKey,
+          model: jobPayload.model,
+          fallbackModel: jobPayload.fallbackModel,
+          lowConfidenceThreshold: jobPayload.lowConfidenceThreshold,
+          failureEscalationThreshold: jobPayload.failureEscalationThreshold,
           mobilePlatform: jobPayload.mobilePlatform,
           autoBuild: jobPayload.autoBuild,
-          useV2Flow: jobPayload.useV2Flow,
+          useV2Flow: resolveUseV2Flow(jobPayload),
         };
 
         try {
