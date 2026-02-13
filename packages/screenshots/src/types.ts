@@ -19,8 +19,16 @@ export interface ScreenshotterOptions {
   evalScreensDir?: string;
   /** Google AI API key (defaults to env vars) */
   googleApiKey?: string;
-  /** Model to use (default: gemini-2.0-flash) */
+  /** OpenAI API key for fallback decision routing (defaults to OPENAI_API_KEY env var) */
+  openaiApiKey?: string;
+  /** Primary exploration model (default: gemini-3-flash-preview) */
   model?: string;
+  /** Fallback exploration model for low-confidence/high-failure decisions (default: gpt-5.2) */
+  fallbackModel?: string;
+  /** Confidence threshold for fallback routing, 0-1 range (default: 0.68) */
+  lowConfidenceThreshold?: number;
+  /** Consecutive action failure threshold for fallback routing (default: 2) */
+  failureEscalationThreshold?: number;
   /** Device name to use (e.g., "iPhone 15 Pro"). If provided, will boot simulator. */
   device?: string;
   /** Platform: ios or android (default: ios) */
@@ -31,6 +39,8 @@ export interface ScreenshotterOptions {
   mobilePlatform?: MobilePlatform;
   /** Whether to auto-build and install the app before capture (default: true if repoUrl provided) */
   autoBuild?: boolean;
+  /** Enable V2 flow orchestration when available (default: true) */
+  useV2Flow?: boolean;
   /** Session ID for process tracking and interactive input */
   sessionId?: string;
   /** Callback when CLI prompts for user input */
@@ -68,6 +78,61 @@ export interface AgentAction {
   params?: Record<string, unknown>;
   reasoning: string;
   shouldScreenshot: boolean;
+  /** Action confidence from 0-1 (higher means more certain) */
+  confidence?: number;
+  /** Model ID that produced the action */
+  modelUsed?: string;
+  /** Why a fallback model was used */
+  escalationReason?: string;
+}
+
+export interface ExplorationStep {
+  /** Step index in chronological order (1-based) */
+  stepNumber: number;
+  /** Action executed at this step */
+  action: {
+    action: AgentAction['action'];
+    params?: Record<string, unknown>;
+  };
+  /** Agent reasoning text */
+  reasoning: string;
+  /** Whether this step was marked as marketable */
+  isMarketable: boolean;
+  /** Optional explanation for marketability */
+  marketableReason?: string;
+  /** Optional screenshot captured at this step */
+  screenshotPath?: string;
+  /** ISO timestamp for this step */
+  timestamp?: string;
+}
+
+export interface ExplorationLog {
+  /** Unique exploration run ID */
+  explorationId: string;
+  /** Target app bundle ID */
+  bundleId: string;
+  /** Runtime platform for this exploration */
+  platform: 'ios' | 'android' | 'unknown' | string;
+  /** Number of exploration steps */
+  totalSteps: number;
+  /** Full chronological list of steps */
+  steps: ExplorationStep[];
+  /** Subset of steps marked as marketable */
+  marketableScreens: ExplorationStep[];
+  /** ISO timestamp for the log */
+  generatedAt?: string;
+}
+
+export interface RefinedFlowMetadata {
+  flowId: string;
+  explorationId: string;
+  generatedAt: string;
+  originalSteps: number;
+  optimizedSteps: number;
+  marketableScreensCaptured: number;
+  maestroFlowPath: string;
+  fallbackUsed?: boolean;
+  fallbackReason?: string;
 }
 
 export interface EnhancedContext {
