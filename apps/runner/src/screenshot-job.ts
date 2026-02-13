@@ -61,8 +61,14 @@ export interface ScreenshotJob {
   devices: DeviceConfig[];
   repoUrl?: string;
   googleApiKey: string;
+  openaiApiKey?: string;
+  model?: string;
+  fallbackModel?: string;
+  lowConfidenceThreshold?: number;
+  failureEscalationThreshold?: number;
   mobilePlatform?: MobilePlatform;
   autoBuild?: boolean;
+  useV2Flow?: boolean;
 }
 
 export interface ScreenshotJobCallbacks {
@@ -151,16 +157,39 @@ export async function handleScreenshotJob(
       maxScreenshots: 6,
       maxSteps: 35,
       googleApiKey: job.googleApiKey,
+      openaiApiKey: job.openaiApiKey,
+      model: job.model,
+      fallbackModel: job.fallbackModel,
+      lowConfidenceThreshold: job.lowConfidenceThreshold,
+      failureEscalationThreshold: job.failureEscalationThreshold,
       device: simulatorName,
       platform,
       repoUrl: job.repoUrl,
       mobilePlatform: job.mobilePlatform,
       autoBuild: job.autoBuild ?? true,
+      useV2Flow: job.useV2Flow,
       sessionId: job.collectionId,
       onPrompt,
     });
 
     onProgress(`Capture complete: ${result.screenshotCount} screenshots`);
+
+    if (result.screenshotCount === 0) {
+      const noScreenshotMessage =
+        job.mobilePlatform === 'swift'
+          ? 'Capture produced 0 screenshots. Swift apps often need stronger accessibility identifiers and non-empty seeded data for reliable exploration.'
+          : 'Capture produced 0 screenshots.';
+      if (!result.errors.includes(noScreenshotMessage)) {
+        result.errors.push(noScreenshotMessage);
+      }
+      onError(noScreenshotMessage);
+    } else if (job.mobilePlatform === 'swift' && result.screenshotCount < 3) {
+      const lowYieldMessage = `Swift capture completed with only ${result.screenshotCount} screenshot(s). Exploration likely stalled on low-actionable UI; consider seeding richer data and adding accessibility identifiers.`;
+      if (!result.errors.includes(lowYieldMessage)) {
+        result.errors.push(lowYieldMessage);
+      }
+      onError(lowYieldMessage);
+    }
 
     const uploadedUrls: string[] = [];
 
