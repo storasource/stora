@@ -104,7 +104,8 @@ const io = new Server(httpServer, {
 });
 
 const runners = new Map<string, string>();
-const jobToRunner = new Map<string, string>();
+const jobToRunnerSocket = new Map<string, string>();
+const jobToRunnerId = new Map<string, string>();
 const runnerActiveJobs = new Map<string, number>();
 const MAX_JOBS_PER_RUNNER = 2;
 
@@ -144,48 +145,78 @@ io.use((socket, next) => {
   next();
 });
 
-function getLeastLoadedRunner(): string | undefined {
-  let bestRunner: string | undefined;
+function getLeastLoadedRunner(): { runnerId: string; socketId: string } | undefined {
+  let bestRunnerId: string | undefined;
+  let bestSocketId: string | undefined;
   let minJobs = Infinity;
 
   for (const [runnerId, socketId] of runners) {
     const activeJobs = runnerActiveJobs.get(runnerId) || 0;
     if (activeJobs < MAX_JOBS_PER_RUNNER && activeJobs < minJobs) {
       minJobs = activeJobs;
-      bestRunner = socketId;
+      bestRunnerId = runnerId;
+      bestSocketId = socketId;
     }
   }
 
-  return bestRunner;
+  if (!bestRunnerId || !bestSocketId) {
+    return undefined;
+  }
+
+  return {
+    runnerId: bestRunnerId,
+    socketId: bestSocketId,
+  };
+}
+
+function reserveRunnerSlot(jobId: string, runnerId: string, socketId: string): void {
+  runnerActiveJobs.set(runnerId, (runnerActiveJobs.get(runnerId) || 0) + 1);
+  jobToRunnerId.set(jobId, runnerId);
+  jobToRunnerSocket.set(jobId, socketId);
+}
+
+function releaseRunnerSlot(jobId: string): void {
+  const runnerId = jobToRunnerId.get(jobId);
+  if (runnerId) {
+    const activeJobs = runnerActiveJobs.get(runnerId) || 0;
+    runnerActiveJobs.set(runnerId, Math.max(0, activeJobs - 1));
+    console.log(
+      chalk.blue(`[Router] Released runner ${runnerId} slot (active: ${runnerActiveJobs.get(runnerId)})`)
+    );
+  }
+
+  jobToRunnerId.delete(jobId);
+  jobToRunnerSocket.delete(jobId);
 }
 
 const worker = createScreenshotWorker(async (job: Job<ScreenshotJobData>) => {
-  const runnerSocketId = getLeastLoadedRunner();
-  
-  if (!runnerSocketId) {
+  const assignedRunner = getLeastLoadedRunner();
+
+  if (!assignedRunner) {
     throw new Error('No runners available');
   }
-  
+
   setJobState(job.data.id, 'assigned');
-  
-  io.emit('job_update', { 
-    jobId: job.data.id, 
+
+  io.emit('job_update', {
+    jobId: job.data.id,
     status: 'assigned',
-    message: 'Found available runner, dispatching job...' 
+    message: 'Found available runner, dispatching job...'
   });
-  
-  // Track which runner gets this job for load balancing
-  const assignedRunnerId = [...runners.entries()].find(([, sid]) => sid === runnerSocketId)?.[0];
-  if (assignedRunnerId) {
-    runnerActiveJobs.set(assignedRunnerId, (runnerActiveJobs.get(assignedRunnerId) || 0) + 1);
-    jobToRunner.set(job.data.id, runnerSocketId);
-    console.log(chalk.blue(`[Router] Assigned job ${job.data.id} to runner ${assignedRunnerId} (active: ${runnerActiveJobs.get(assignedRunnerId)})`));
-  }
+
+  reserveRunnerSlot(job.data.id, assignedRunner.runnerId, assignedRunner.socketId);
+  console.log(
+    chalk.blue(
+      `[Router] Assigned job ${job.data.id} to runner ${assignedRunner.runnerId} (active: ${runnerActiveJobs.get(assignedRunner.runnerId)})`
+    )
+  );
 
   try {
-    await io.to(runnerSocketId).timeout(10000).emitWithAck('run_job', job.data);
+    await io.to(assignedRunner.socketId).timeout(15000).emitWithAck('run_job', job.data);
     setJobState(job.data.id, 'running');
   } catch (e) {
+    releaseRunnerSlot(job.data.id);
+
     const err = e as Error;
     console.error(chalk.red(`[Worker] Runner failed to acknowledge job: ${err.message}`));
 
@@ -197,8 +228,8 @@ const worker = createScreenshotWorker(async (job: Job<ScreenshotJobData>) => {
       ? 'Runner failed to accept job (timeout). Likely missing run_job acknowledgment callback on runner. Verify runner/orchestrator versions and ORCHESTRATOR_TOKEN.'
       : 'Runner failed to accept job. Check runner logs and orchestrator connectivity.';
 
-    io.emit('job_error', { 
-      jobId: job.data.id, 
+    io.emit('job_error', {
+      jobId: job.data.id,
       error: diagnosticMessage,
     });
 
@@ -208,9 +239,11 @@ const worker = createScreenshotWorker(async (job: Job<ScreenshotJobData>) => {
 
 worker.on('failed', (job, err) => {
   if (job) {
-    io.emit('job_error', { 
-      jobId: job.data.id, 
-      error: err.message || 'Job failed' 
+    releaseRunnerSlot(job.data.id);
+
+    io.emit('job_error', {
+      jobId: job.data.id,
+      error: err.message || 'Job failed'
     });
     io.emit('job_complete', {
       jobId: job.data.id,
@@ -224,6 +257,16 @@ worker.on('completed', (job) => {
   // We rely on the runner to send the explicit 'job_complete' event with artifacts,
   // but we can send a backup status update here if needed.
   // For now, let's just log.
+  if (job) {
+    const runnerId = jobToRunnerId.get(job.data.id);
+    if (runnerId) {
+      console.log(
+        chalk.gray(
+          `[Worker] Queue marked completed for ${job.data.id}; waiting for runner completion event from ${runnerId}`
+        )
+      );
+    }
+  }
 });
 
 io.on('connection', (socket) => {
@@ -231,13 +274,42 @@ io.on('connection', (socket) => {
 
   if (type === 'runner') {
     const id = runnerId as string;
+    const previousSocketId = runners.get(id);
+    if (previousSocketId && previousSocketId !== socket.id) {
+      console.warn(
+        chalk.yellow(
+          `[Runner] Replacing existing socket for ${id}: ${previousSocketId} -> ${socket.id}`
+        )
+      );
+    }
+
     console.log(chalk.green(`[Runner] Connected: ${id} (${socket.id})`));
     runners.set(id, socket.id);
-    
+    if (!runnerActiveJobs.has(id)) {
+      runnerActiveJobs.set(id, 0);
+    }
+
     socket.on('disconnect', () => {
+      const currentSocketId = runners.get(id);
+      if (currentSocketId && currentSocketId !== socket.id) {
+        console.log(
+          chalk.gray(
+            `[Runner] Ignoring stale disconnect for ${id} (${socket.id}); active socket is ${currentSocketId}`
+          )
+        );
+        return;
+      }
+
       console.log(chalk.yellow(`[Runner] Disconnected: ${id}`));
       runners.delete(id);
       runnerActiveJobs.delete(id);
+
+      for (const [jobId, mappedRunnerId] of jobToRunnerId.entries()) {
+        if (mappedRunnerId === id) {
+          jobToRunnerId.delete(jobId);
+          jobToRunnerSocket.delete(jobId);
+        }
+      }
     });
 
     socket.on('job_update', (data) => {
@@ -254,10 +326,8 @@ io.on('connection', (socket) => {
        console.log(chalk.green(`[Event] job_complete: ${data.status}`));
        if (data.jobId) {
          setJobState(data.jobId, data.status === 'success' ? 'completed' : 'failed');
-         jobToRunner.delete(data.jobId);
-         const activeJobs = runnerActiveJobs.get(id) || 0;
-         runnerActiveJobs.set(id, Math.max(0, activeJobs - 1));
-         console.log(chalk.blue(`[Router] Runner ${id} job done (active: ${runnerActiveJobs.get(id)})`));
+         releaseRunnerSlot(data.jobId);
+         console.log(chalk.blue(`[Router] Runner ${id} job done`));
        }
        io.emit('job_complete', data);
     });
@@ -278,7 +348,8 @@ io.on('connection', (socket) => {
       timestamp: number 
     }) => {
       console.log(chalk.yellow(`[Event] job_prompt_required for job ${data.jobId}`));
-      jobToRunner.set(data.jobId, socket.id);
+      jobToRunnerSocket.set(data.jobId, socket.id);
+      jobToRunnerId.set(data.jobId, id);
       io.emit('job_prompt_required', {
         jobId: data.jobId,
         promptId: data.promptId,
@@ -344,7 +415,7 @@ io.on('connection', (socket) => {
             return;
         }
 
-        io.to(runnerSocketId).emit('run_job', {
+        io.to(runnerSocketId.socketId).emit('run_job', {
             id: `job-${Date.now()}`,
             ...jobPayload
         });
@@ -352,7 +423,7 @@ io.on('connection', (socket) => {
 
     socket.on('job_prompt_response', (data: { jobId: string; promptId?: string; input: string }) => {
       console.log(chalk.cyan(`[Client] Prompt response for job ${data.jobId}`));
-      const runnerSocketId = jobToRunner.get(data.jobId);
+      const runnerSocketId = jobToRunnerSocket.get(data.jobId);
       if (runnerSocketId) {
         io.to(runnerSocketId).emit('job_prompt_response', {
           jobId: data.jobId,
